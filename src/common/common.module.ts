@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, MiddlewareConsumer, Module, RequestMethod } from '@nestjs/common';
 import { WinstonModule } from 'nest-winston';
 import winston from 'winston';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -7,6 +7,9 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ValidationService } from './validation.service';
 import { APP_FILTER } from '@nestjs/core';
 import { ErrorFilter } from './error.config';
+import { SendMailService } from './send-mail.service';
+import { User } from '../features/auth/entities/auth.entity';
+import { AuthMiddleware } from './middleware';
 @Global()
 @Module({
   imports: [
@@ -38,7 +41,7 @@ import { ErrorFilter } from './error.config';
         charset: 'utf8mb4',
       }),
     }),
-    TypeOrmModule.forFeature(),
+    TypeOrmModule.forFeature([User]),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -48,9 +51,20 @@ import { ErrorFilter } from './error.config';
   ],
   providers: [
     ValidationService,
-    // SendMailService,
+    SendMailService,
     { provide: APP_FILTER, useClass: ErrorFilter },
   ],
   exports: [TypeOrmModule, ThrottlerModule],
 })
-export class CommonModule {}
+export class CommonModule {
+    configure(consumer: MiddlewareConsumer){
+        consumer.apply(AuthMiddleware)
+        .exclude(
+            {
+                path: 'api/v1/auth/register',
+                method: RequestMethod.POST
+            }
+        )
+        .forRoutes()
+    }
+}
