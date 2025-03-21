@@ -94,6 +94,7 @@ export class AuthController {
 
   // get user
   @Get('getUser')
+  @HttpCode(HttpStatus.OK)
   async getUser(@Req() req: Request): Promise<any> {
     const user = req['user'];
     if (!user) {
