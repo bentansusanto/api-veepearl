@@ -38,6 +38,7 @@ import { ErrorFilter } from './error.config';
         charset: 'utf8mb4',
       }),
     }),
+    TypeOrmModule.forFeature(),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
