@@ -215,25 +215,14 @@ export class AuthService {
   }
 
   // get user
-  async getUser(user:User):Promise<any> {
-    try {
-      return{
-        message: 'User found',
-        data: {
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        }
+  async getUser(user: User):Promise<any> {
+    return{
+      message: 'User found',
+      data: {
+        name: user.name,
+        email: user.email,
+        role: user.role,
       }
-    } catch (error:any) {
-      this.logger.error('Failed to get user', error.message);
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        'Failed to get user',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
     }
   }
 
