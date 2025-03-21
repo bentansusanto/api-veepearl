@@ -59,7 +59,7 @@ export class AuthService {
         email: createReq.email,
         password: hashPassword,
         name: createReq.name,
-        role: createReq.role || UserRole.CLIENT,
+        role: createReq.role || UserRole.CUSTOMER,
         otpCode,
         expOtp: new Date(expiry),
       })
@@ -133,7 +133,7 @@ export class AuthService {
         data: {
           name: findUser.name,
           email: findUser.email,
-          role: findUser.role || UserRole.CLIENT,
+          role: findUser.role || UserRole.CUSTOMER,
         },
       });
 
@@ -142,7 +142,7 @@ export class AuthService {
         data: {
           name: findUser.name,
           email: findUser.email,
-          role: findUser.role || UserRole.CLIENT,
+          role: findUser.role || UserRole.CUSTOMER,
         },
       };
 

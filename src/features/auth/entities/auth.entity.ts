@@ -7,7 +7,7 @@ import {
   } from 'typeorm';
   
   export enum UserRole {
-    CLIENT = 'client',
+    CUSTOMER = 'customer',
     ADMIN = 'admin',
   }
   
@@ -34,7 +34,7 @@ import {
     @Column({
       type: 'enum',
       enum: UserRole,
-      default: UserRole.CLIENT,
+      default: UserRole.CUSTOMER,
     })
     role: UserRole;
   
