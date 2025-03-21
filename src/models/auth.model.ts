@@ -1,4 +1,4 @@
-import { UserRole } from 'src/features/auth/entities/auth.entity';
+import { UserRole } from '../features/auth/entities/auth.entity';
 
 export class RegisterRequest {
   name: string;
