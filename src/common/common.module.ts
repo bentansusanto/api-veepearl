@@ -95,11 +95,11 @@ export class CommonModule {
         )
         .forRoutes(
             {
-                path: 'api/v1/getUser',
+                path: 'api/v1/auth/getUser',
                 method: RequestMethod.GET
             },
             {
-                path: 'api/v1/logout',
+                path: 'api/v1/auth/logout',
                 method: RequestMethod.POST
             },
         )
