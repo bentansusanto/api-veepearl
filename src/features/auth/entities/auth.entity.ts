@@ -11,7 +11,7 @@ export enum UserRole {
   ADMIN = 'admin',
 }
 
-@Entity('users')
+@Entity('user')
 export class User {
   @PrimaryColumn()
   id: string;
