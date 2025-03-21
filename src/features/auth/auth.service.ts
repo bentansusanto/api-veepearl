@@ -59,7 +59,7 @@ export class AuthService {
         email: createReq.email,
         password: hashPassword,
         name: createReq.name,
-        role: createReq.role,
+        role: createReq.role || UserRole.CUSTOMER,
         otpCode,
         expOtp: new Date(expiry),
       })
