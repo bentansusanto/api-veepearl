@@ -63,8 +63,45 @@ export class CommonModule {
             {
                 path: 'api/v1/auth/register',
                 method: RequestMethod.POST
-            }
+            },
+            {
+                path: 'api/v1/auth/verify_account',
+                method: RequestMethod.POST
+            },
+            {
+                path: 'api/v1/auth/login',
+                method: RequestMethod.POST
+            },
+            {
+                path: 'api/v1/auth/verify_otp',
+                method: RequestMethod.POST
+            },
+            {
+                path: 'api/v1/auth/generate_new_otp',
+                method: RequestMethod.POST
+            },
+            {
+                path: 'api/v1/auth/refresh_token',
+                method: RequestMethod.POST
+            },
+            {
+                path: 'api/v1/auth/forgot_password',
+                method: RequestMethod.POST
+            },
+            {
+                path: 'api/v1/auth/reset_password',
+                method: RequestMethod.POST
+            },
         )
-        .forRoutes()
+        .forRoutes(
+            {
+                path: 'api/v1/getUser',
+                method: RequestMethod.GET
+            },
+            {
+                path: 'api/v1/logout',
+                method: RequestMethod.POST
+            },
+        )
     }
 }
