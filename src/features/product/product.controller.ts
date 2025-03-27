@@ -12,7 +12,7 @@ import {
   Put,
 } from '@nestjs/common';
 import { ProductService } from './product.service';
-import { ProductRequest, UpdateProductRequest } from 'src/models/product.model';
+import { ProductRequest, UpdateProductRequest } from '../../models/product.model';
 import { Request } from 'express';
 
 
