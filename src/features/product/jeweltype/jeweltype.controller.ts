@@ -12,7 +12,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { JewelRequest, UpdateJewelRequest } from 'src/models/jewel.model';
+import { JewelRequest, UpdateJewelRequest } from '../../../models/jewel.model';
 import { JeweltypeService } from './jeweltype.service';
 
 @Controller('api/v1/')
