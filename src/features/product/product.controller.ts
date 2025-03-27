@@ -1,34 +1,100 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpStatus,
+  HttpCode,
+  Req,
+  Put,
+} from '@nestjs/common';
 import { ProductService } from './product.service';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
+import { ProductRequest, UpdateProductRequest } from 'src/models/product.model';
+import { Request } from 'express';
 
-@Controller('product')
+
+@Controller('api/v1/')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
-  @Post()
-  create(@Body() createProductDto: CreateProductDto) {
-    return this.productService.create(createProductDto);
+  // create product
+  @Post('create_product')
+  @HttpCode(HttpStatus.CREATED)
+  async createProduct(@Req() req: Request, @Body() productReq: ProductRequest):Promise<any>  {
+    const user = req['user']
+    if(!user){
+      return {
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Unauthorized',
+      }
+    }
+    const userId = user.id
+    const result = await this.productService.createProduct(userId, productReq);
+    return{
+      message: result.message,
+      data: result.data,
+    }
   }
 
-  @Get()
-  findAll() {
-    return this.productService.findAll();
+  // find all product
+  @Get('products')
+  @HttpCode(HttpStatus.OK)
+  async findAllProduct():Promise<any> {
+    const result = await this.productService.findAllProduct();
+    return{
+      message: result.message,
+      data: result.data,
+    }
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.productService.findOne(+id);
+  // find product by id
+  @Get('products/:id')
+  async findProductId(@Param('id') productId: string):Promise<any>  {
+    const result = await this.productService.findProduct(productId);
+    return{
+      message: result.message,
+      data: result.data,
+    }
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductDto: UpdateProductDto) {
-    return this.productService.update(+id, updateProductDto);
+  // update product
+  @Put('update_product/:id')
+  @HttpCode(HttpStatus.OK)
+  async updateProduct(@Req() req:Request, @Param('id') productId: string, @Body() productReq: UpdateProductRequest):Promise<any>  {
+    const user = req['user']
+    if(!user){
+      return {
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Unauthorized',
+      }
+    }
+    const userId = user.id
+    const result = await this.productService.updateProduct(userId, productId, productReq);
+    return{
+      message: result.message,
+      data: result.data,
+    }
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productService.remove(+id);
+  // delete product
+  @Delete('delete_product/:id')
+  @HttpCode(HttpStatus.OK)
+  async removeProduct(@Req() req: Request, @Param('id') productId: string): Promise<any>  {
+    const user = req['user']
+    if(!user){
+      return {
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Unauthorized',
+      }
+    }
+    const userId = user.id
+    const result = await this.productService.removeProduct(userId, productId);
+    return {
+      message: result.message,
+      data: result.data,
+    }
   }
 }

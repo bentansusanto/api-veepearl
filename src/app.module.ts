@@ -3,9 +3,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './features/auth/auth.module';
+import { ProductModule } from './features/product/product.module';
+import { JeweltypeModule } from './features/product/jeweltype/jeweltype.module';
 
 @Module({
-  imports: [CommonModule, AuthModule],
+  imports: [CommonModule, AuthModule, ProductModule, JeweltypeModule],
   controllers: [AppController],
   providers: [AppService],
 })
