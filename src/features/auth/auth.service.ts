@@ -201,6 +201,7 @@ export class AuthService {
 
       return {
         message: 'Login Successfull Check OTP Code in your email',
+        data: findUser.role,
       };
     } catch (error:any) {
       this.logger.error('Failed to create subscription', error.message);
