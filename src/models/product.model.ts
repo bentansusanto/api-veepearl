@@ -10,6 +10,7 @@ export class ProductRequest {
     video: string[];
     popular?: boolean;
     jeweltypeId: string;
+    sku: string;
 }
 
 export class UpdateProductRequest {
@@ -24,4 +25,5 @@ export class UpdateProductRequest {
     video?: string[];
     popular?: boolean;
     jeweltypeId?: string;
+    sku?: string;
 }

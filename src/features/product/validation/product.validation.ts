@@ -13,6 +13,7 @@ export class ProductValidation {
         images: z.array(z.string()),
         video: z.array(z.string()),
         popular: z.boolean().optional(),
+        sku: z.string(),
     })
 
     static readonly UPDATEPRODUCT:ZodType = z.object({
@@ -27,5 +28,6 @@ export class ProductValidation {
         images: z.array(z.string()).optional(),
         video: z.array(z.string()).optional(),
         popular: z.boolean().optional(),
+        sku: z.string().optional(),
     })
 }

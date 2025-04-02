@@ -25,6 +25,9 @@ export class Product {
     @Column()
     grade: string;
 
+    @Column({unique: true})
+    sku: string;
+
     @Column({nullable: true})
     size: string;
 
