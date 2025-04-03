@@ -17,6 +17,7 @@ import { User } from '../features/auth/entities/auth.entity';
 import { AuthMiddleware } from './middleware';
 import { Product } from '../features/product/entities/product.entity';
 import { Jeweltype } from '../features/product/jeweltype/entities/jeweltype.entity';
+import { Cart } from '../features/cart/entities/cart.entity';
 @Global()
 @Module({
   imports: [
@@ -48,7 +49,7 @@ import { Jeweltype } from '../features/product/jeweltype/entities/jeweltype.enti
         charset: 'utf8mb4',
       }),
     }),
-    TypeOrmModule.forFeature([User, Product, Jeweltype]),
+    TypeOrmModule.forFeature([User, Product, Jeweltype, Cart]),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -154,6 +155,23 @@ export class CommonModule {
         },
         {
           path: 'api/v1/delete_jeweltype/:id',
+          method: RequestMethod.DELETE,
+        },
+        // cart
+        {
+          path: 'api/v1/add_cart',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'api/v1/find_cart',
+          method: RequestMethod.GET,
+        },
+        {
+          path: 'api/v1/update_product_cart/:id',
+          method: RequestMethod.PUT,
+        },
+        {
+          path: 'api/v1/remove_product_cart/:id',
           method: RequestMethod.DELETE,
         },
       );

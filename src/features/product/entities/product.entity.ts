@@ -1,5 +1,6 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryColumn, UpdateDateColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryColumn, UpdateDateColumn } from "typeorm";
 import { Jeweltype } from "../jeweltype/entities/jeweltype.entity";
+import { Cart } from "../../../features/cart/entities/cart.entity";
 
 @Entity('product')
 export class Product {
@@ -9,6 +10,9 @@ export class Product {
     @ManyToOne(() => Jeweltype, (jeweltype) => jeweltype.products)
     @JoinColumn({ name: 'jeweltypeId' })
     jeweltype: Jeweltype;
+
+    @OneToMany(() => Cart, (cart) => cart.product)
+    carts: Cart[];
 
     @Column()
     name_product: string

@@ -1,7 +1,9 @@
+import { Cart } from '../../../features/cart/entities/cart.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  OneToMany,
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -49,6 +51,9 @@ export class User {
 
   @Column({ nullable: true, type: 'timestamp' })
   expAccAt: Date;
+
+  @OneToMany(() => Cart, (cart) => cart.user)
+  carts: Cart[];
 
   @CreateDateColumn()
   createdAt: Date;
