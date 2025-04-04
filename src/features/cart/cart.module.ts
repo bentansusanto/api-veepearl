@@ -5,7 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Cart } from './entities/cart.entity';
 import { Product } from '../product/entities/product.entity';
 import { User } from '../auth/entities/auth.entity';
-import { ValidationService } from 'src/common/validation.service';
+import { ValidationService } from '../../common/validation.service';
 
 @Module({
   controllers: [CartController],

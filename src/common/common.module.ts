@@ -18,6 +18,8 @@ import { AuthMiddleware } from './middleware';
 import { Product } from '../features/product/entities/product.entity';
 import { Jeweltype } from '../features/product/jeweltype/entities/jeweltype.entity';
 import { Cart } from '../features/cart/entities/cart.entity';
+import { Pemesan } from '../features/pemesan/entities/pemesan.entity';
+import { Order } from '../features/order/entities/order.entity';
 @Global()
 @Module({
   imports: [
@@ -49,7 +51,7 @@ import { Cart } from '../features/cart/entities/cart.entity';
         charset: 'utf8mb4',
       }),
     }),
-    TypeOrmModule.forFeature([User, Product, Jeweltype, Cart]),
+    TypeOrmModule.forFeature([User, Product, Jeweltype, Cart, Pemesan, Order]),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -173,6 +175,52 @@ export class CommonModule {
         {
           path: 'api/v1/remove_product_cart/:id',
           method: RequestMethod.DELETE,
+        },
+        // pemesan
+        {
+          path: 'api/v1/create_pemesan',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'api/v1/update_pemesan/:id',
+          method: RequestMethod.PUT,
+        },
+        {
+          path: 'api/v1/delete_pemesan/:id',
+          method: RequestMethod.DELETE,
+        },
+        {
+          path: 'api/v1/find_pemesan/:id',
+          method: RequestMethod.GET,
+        },
+        {
+          path: 'api/v1/find_all_pemesan',
+          method: RequestMethod.GET,
+        },
+        // order
+        {
+          path: 'api/v1/create_order_product',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'api/v1/capture_payment_paypal',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'api/v1/verify_payment_paypal',
+          method: RequestMethod.GET,
+        },
+        {
+          path: 'api/v1/verify_payment_cod/:id',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'api/v1/find_history_order',
+          method: RequestMethod.GET,
+        },
+        {
+          path: 'api/v1/find_order_user',
+          method: RequestMethod.GET,
         },
       );
   }

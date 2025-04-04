@@ -1,3 +1,4 @@
+import { Order } from '../../../features/order/entities/order.entity';
 import { Cart } from '../../../features/cart/entities/cart.entity';
 import {
   Column,
@@ -7,6 +8,7 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Pemesan } from '../../../features/pemesan/entities/pemesan.entity';
 
 export enum UserRole {
   CUSTOMER = 'customer',
@@ -21,7 +23,7 @@ export class User {
   @Column()
   name: string;
 
-  @Column()
+  @Column({unique: true})
   email: string;
 
   @Column()
@@ -54,6 +56,12 @@ export class User {
 
   @OneToMany(() => Cart, (cart) => cart.user)
   carts: Cart[];
+
+  @OneToMany(() => Order, (order) => order.user)
+  orders: Order[];
+
+  @OneToMany(() => Pemesan, (pemesan) => pemesan.user)
+  pemesans: Pemesan[];
 
   @CreateDateColumn()
   createdAt: Date;

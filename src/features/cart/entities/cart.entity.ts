@@ -9,6 +9,7 @@ import {
   JoinColumn,
   Column,
 } from 'typeorm';
+import { Order } from '../../../features/order/entities/order.entity';
 
 @Entity('cart')
 export class Cart {
@@ -18,6 +19,10 @@ export class Cart {
   @ManyToOne(() => User, (user) => user.carts)
   @JoinColumn({ name: 'userId' })
   user: User;
+
+  @ManyToOne(() => Order, (order) => order.carts, { nullable: true })
+  @JoinColumn({ name: 'orderId' })
+  order: Order;
 
   @ManyToOne(() => Product, (product) => product.carts)
   @JoinColumn({ name: 'productId' })

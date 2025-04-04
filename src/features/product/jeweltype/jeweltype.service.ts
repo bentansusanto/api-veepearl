@@ -7,7 +7,7 @@ import { Jeweltype } from './entities/jeweltype.entity';
 import { Repository } from 'typeorm';
 import { User, UserRole } from '../../../features/auth/entities/auth.entity';
 import Hashids from 'hashids';
-import { JewelRequest, UpdateJewelRequest } from 'src/models/jewel.model';
+import { JewelRequest, UpdateJewelRequest } from '../../../models/jewel.model';
 import { JewelTypeValidation } from './validation/jeweltype.validation';
 
 @Injectable()

@@ -10,7 +10,7 @@ export class SendOrderProduct {
   orderCode: string;
   customerName: string;
   totalAmount: number;
-  orderDetails: any;
+  orderDetails?: any;
   paymentMethod: string;
   paymentStatus: string;
   subjectMessage: string;

@@ -6,9 +6,19 @@ import { AuthModule } from './features/auth/auth.module';
 import { ProductModule } from './features/product/product.module';
 import { JeweltypeModule } from './features/product/jeweltype/jeweltype.module';
 import { CartModule } from './features/cart/cart.module';
+import { PemesanModule } from './features/pemesan/pemesan.module';
+import { OrderModule } from './features/order/order.module';
 
 @Module({
-  imports: [CommonModule, AuthModule, ProductModule, JeweltypeModule, CartModule],
+  imports: [
+    CommonModule,
+    AuthModule,
+    ProductModule,
+    JeweltypeModule,
+    CartModule,
+    PemesanModule,
+    OrderModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
