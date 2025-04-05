@@ -7,7 +7,7 @@ export class ProductRequest {
     thumbnail: string;
     stock_ready?: boolean;
     images: string[];
-    video: string[];
+    video?: string[];
     popular?: boolean;
     jeweltypeId: string;
     sku: string;

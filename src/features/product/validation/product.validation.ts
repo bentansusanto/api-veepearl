@@ -11,7 +11,7 @@ export class ProductValidation {
         stock_ready: z.boolean().optional(),
         thumbnail: z.string(),
         images: z.array(z.string()),
-        video: z.array(z.string()),
+        video: z.array(z.string()).optional(),
         popular: z.boolean().optional(),
         sku: z.string(),
     })

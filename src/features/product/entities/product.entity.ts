@@ -47,7 +47,7 @@ export class Product {
     @Column({type: 'json'})
     images: string[];
 
-    @Column({type: 'json'})
+    @Column({type: 'json', nullable: true})
     video: string[];
 
     @CreateDateColumn()
