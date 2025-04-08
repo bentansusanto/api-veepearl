@@ -120,6 +120,9 @@ export class CartService {
           select: {
             product: {
               id: true,
+              name_product: true,
+              sku: true,
+              thumbnail: true,
             },
             id: true, // Include the cart's i
             quantity: true,
