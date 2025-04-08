@@ -169,9 +169,21 @@ export class CartService {
   async updateCart(
     userId: string,
     cartId: string,
-    quantity: number,
+    cartReq: UpdateCartRequest,
   ): Promise<any> {
     try {
+      // validate request
+      let updateReq: UpdateCartRequest;
+      try {
+        updateReq = await this.validationService.validate(
+          CartValidation.UPDATECART,
+          cartReq,
+        );
+      }catch (error: any) {
+        this.logger.error('Invalid request', error.message);
+        throw new HttpException('Invalid request', HttpStatus.BAD_REQUEST);
+      }
+
       const [findUser, findCart] = await Promise.all([
         this.userRepository.findOne({ where: { id: userId } }),
         this.cartRepository.findOne({
@@ -199,13 +211,13 @@ export class CartService {
       }
   
       // ✅ Update quantity
-      if (quantity <= 0) {
+      if (updateReq.quantity <= 0) {
         await this.cartRepository.remove(findCart);
         this.logger.info({ message: 'Item removed from cart' });
         return { message: 'Item removed from cart' };
       }
   
-      findCart.quantity = quantity;
+      findCart.quantity = updateReq.quantity;;
       findCart.total_price = findCart.quantity * findCart.product.price;
   
       const result = await this.cartRepository.save(findCart);
