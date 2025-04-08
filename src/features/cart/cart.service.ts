@@ -169,7 +169,7 @@ export class CartService {
   async updateCart(
     userId: string,
     cartId: string,
-    action: 'increase' | 'decrease',
+    quantity: number,
   ): Promise<any> {
     try {
       const [findUser, findCart] = await Promise.all([
@@ -177,52 +177,39 @@ export class CartService {
         this.cartRepository.findOne({
           where: {
             id: cartId,
-            user: {
-              id: userId,
-            },
+            user: { id: userId },
           },
           relations: ['product', 'user'],
         }),
       ]);
-      // if user not found
+  
       if (!findUser) {
         this.logger.error('User not found');
         throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
-      // if cart not found
+  
       if (!findCart || findCart.user.id !== userId) {
         this.logger.error('Cart not found or user not match');
-        throw new HttpException(
-          'Cart not found or user not match',
-          HttpStatus.NOT_FOUND,
-        );
-      }
-
-      // check stock ready or not
-      if (findCart.product.stock_ready === false) {
-        this.logger.error('Product stock not ready');
-        throw new HttpException('Product stock not ready', HttpStatus.NOT_FOUND);
+        throw new HttpException('Cart not found or user not match', HttpStatus.NOT_FOUND);
       }
   
-      // 🚀 Update quantity
-      if (action === 'increase') {
-        findCart.quantity += 1;
-      } else {
-        if (findCart.quantity === 1) {
-          await this.cartRepository.remove(findCart);
-          this.logger.info({
-            message: 'Item removed from cart',
-          })
-          return { message: 'Item removed from cart' };
-        }
-        findCart.quantity -= 1;
+      if (findCart.product.stock_ready === false) {
+        this.logger.error('Product stock not ready');
+        throw new HttpException('Product stock not ready', HttpStatus.BAD_REQUEST);
       }
-
-      // 🔄 Update total price
+  
+      // ✅ Update quantity
+      if (quantity <= 0) {
+        await this.cartRepository.remove(findCart);
+        this.logger.info({ message: 'Item removed from cart' });
+        return { message: 'Item removed from cart' };
+      }
+  
+      findCart.quantity = quantity;
       findCart.total_price = findCart.quantity * findCart.product.price;
-
+  
       const result = await this.cartRepository.save(findCart);
-
+  
       this.logger.info({
         message: 'Cart updated successfully',
         data: {
@@ -232,9 +219,9 @@ export class CartService {
           total_price: result.total_price,
           createdAt: result.createdAt,
           updatedAt: result.updatedAt,
-        }
+        },
       });
-
+  
       return {
         message: 'Cart updated successfully',
         data: {
@@ -244,19 +231,14 @@ export class CartService {
           total_price: result.total_price,
           createdAt: result.createdAt,
           updatedAt: result.updatedAt,
-        }
+        },
       };
-    } catch (error: any) {
-      this.logger.error('Failed to update cart', error.message);
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        'Failed to update cart',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    } catch (error) {
+      this.logger.error(`Update cart failed: ${error.message}`);
+      throw new HttpException('Failed to update cart', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
+  
 
   // Remove product from cart
   async removeFromCart(userId: string, cartId: string): Promise<any> {
