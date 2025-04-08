@@ -123,6 +123,8 @@ export class CartService {
               name_product: true,
               sku: true,
               thumbnail: true,
+              grade: true,
+              size: true,
             },
             id: true, // Include the cart's i
             quantity: true,
