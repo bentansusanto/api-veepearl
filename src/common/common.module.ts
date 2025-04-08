@@ -47,7 +47,7 @@ import { Order } from '../features/order/entities/order.entity';
         password: configService.get<string>('DB_PASS') || 'Veepearls01!',
         database: configService.get<string>('DB_NAME'),
         autoLoadEntities: true,
-        synchronize: configService.get<string>('NODE_ENV') === 'development',
+        synchronize: configService.get<string>('NODE_ENV') === 'production',
         charset: 'utf8mb4',
       }),
     }),
