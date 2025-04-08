@@ -60,13 +60,13 @@ export class CartController {
 
   @Put('update_product_cart/:id')
   @HttpCode(HttpStatus.OK)
-  async updatedCart(@Req() req: Request, @Param('id') cartId: string,  @Body('action') action: 'increase' | 'decrease'):Promise<any>  {
+  async updatedCart(@Req() req: Request, @Param('id') cartId: string,  @Body() quantity: number):Promise<any>  {
     const user = req['user']
     if(!user){
       throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED)
     }
     const userId = user.id
-    const result = await this.cartService.updateCart(userId, cartId, action)
+    const result = await this.cartService.updateCart(userId, cartId, quantity)
     return{
       message: result.message,
       data: result.data,
