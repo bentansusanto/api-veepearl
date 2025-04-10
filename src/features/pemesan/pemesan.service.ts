@@ -155,6 +155,7 @@ export class PemesanService {
             id: userId,
           },
         },
+        relations: ['user']
       })
       // check if pemesan not found
       if(!findPemesan || findPemesan.user.id !== userId){
@@ -177,7 +178,7 @@ export class PemesanService {
         throw error;
       }
       throw new HttpException(
-        'Failed to find pemesan',
+        error.message || 'Failed to find pemesan',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
