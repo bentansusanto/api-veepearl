@@ -155,7 +155,20 @@ export class PemesanService {
             id: userId,
           },
         },
-        relations: ['user']
+        relations: ['user'],
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone: true,
+          address: true,
+          city: true,
+          country: true,
+          zip_code: true,
+          user: {
+            id: true,
+          }
+        }
       })
       // check if pemesan not found
       if(!findPemesan || findPemesan.user.id !== userId){
