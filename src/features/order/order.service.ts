@@ -390,43 +390,13 @@ export class OrderService {
       });
 
       await this.orderRepository.save(newOrder);
-
-      const orders = `
-              <div style="margin-bottom: 10px;">
-                <p><strong>Oder Code:#</strong> ${
-                  newOrder.order_code
-                }</p>
-                <p><strong>Total Price:#</strong> ${
-                  newOrder.amount
-                }</p>
-                <div><strong>List product:</strong> 
-                  <ul>
-                    ${findCart.map((list:any) => (
-                      `<li>
-                         <p><strong>Product Name:</strong> ${list.product.name_product}</p>
-                         <p><strong>Quantity:</strong> ${list.quantity}</p>
-                      </li>`
-                    ))}
-                  </ul>
-                </div>
-                <p><strong>Date:</strong> ${new Date(
-                  newOrder.createdAt
-                ).toLocaleDateString("id-ID", {
-                  weekday: "short", // "Sun"
-                  day: "2-digit", // "12"
-                  month: "short", // "Des"
-                  year: "numeric", // "2025"
-                })}</p>
-                <hr style="border: 0; border-top: 1px solid #ddd;" />
-              </div>
-            `;
-
+      
       await this.sendMailService.sendOrderNotification(EmailOrders.ORDER_PRODUCT, {
         orderCode: newOrder.order_code,
         email: findPemesan.email,
         customerName: findPemesan.name,
         totalAmount: newOrder.amount,
-        orderDetails: orders,
+        orderDetails: this.buildOrderHtml(findCart, newOrder),
         paymentMethod: newOrder.payment_method,
         paymentStatus: newOrder.payment_status,
         subjectMessage: `New orders from ${newOrder.pemesan.name}`
