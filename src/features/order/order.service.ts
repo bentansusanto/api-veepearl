@@ -115,8 +115,8 @@ export class OrderService {
           application_context: {
             // return_url: `${process.env.FRONTEND_URL}/checkout/?orderId=${orderId}`,
             // cancel_url: `${process.env.FRONTEND_URL}`,
-            return_url: `http://localhost:8081/checkout/?orderId=${orderId}`,
-            cancel_url: `http://localhost:8081`,
+            return_url: `https://veepearls.com/checkout/?orderId=${orderId}`,
+            cancel_url: `https://veepearls.com`,
             shipping_preference: 'NO_SHIPPING',
             user_action: 'PAY_NOW',
             brand_name: 'veepearls.com',
