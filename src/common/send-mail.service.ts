@@ -11,12 +11,12 @@ export class SendMailService {
     @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
   ) {}
   private transporter = nodemailer.createTransport({
-    host: 'mail.pacifictravelindo.com',
+    host: 'mail.veepearls.com',
     port: 465,
     secure: true,
     auth: {
-      user: process.env.USERNAME, // Pastikan sesuai dengan email CPanel
-      pass: process.env.PASSWORD,
+      user: process.env.USERNAME ?? "sales@veepearls.com", // Pastikan sesuai dengan email CPanel
+      pass: process.env.PASSWORD ?? "Office123456!",
     },
   });
 
