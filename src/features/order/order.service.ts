@@ -88,7 +88,7 @@ export class OrderService {
   }
 
   // create paypal order
-  private async payPalOrder(orderId: string, totalPrice: number) {
+  private async createPayPalOrder(orderId: string, totalPrice: number) {
     // Dapatkan token akses dari PayPal
     const accessToken = await this.authorizationPaypal();
 
@@ -142,84 +142,26 @@ export class OrderService {
     };
   }
 
-  private async createOrderPaypal(newOrder: Order, totalPrice: number) {
-    const paypalOrder = await this.payPalOrder(newOrder.id, totalPrice);
-  
-    await this.orderRepository.update(newOrder.id, {
-      transactionId: paypalOrder.paypal_order_id,
-      payerEmail: paypalOrder.payer_email,
-    });
-  
-    this.logger.info({
-      message: 'Order PayPal created successfully',
-      data: {
-        id: newOrder.id,
-        order_code: newOrder.order_code,
-        payment_method: newOrder.payment_method,
-        pemesanId: newOrder.pemesan.id,
-        amount: newOrder.amount,
-        transactionId: paypalOrder.paypal_order_id,
-        payerEmail: paypalOrder.payer_email,
-        redirect_url: paypalOrder.approval_url,
-      },
-    });
-  
-    return {
-      message: 'Order PayPal created successfully',
-      data: {
-        id: newOrder.id,
-        order_code: newOrder.order_code,
-        payment_method: newOrder.payment_method,
-        pemesanId: newOrder.pemesan.id,
-        amount: newOrder.amount,
-        transactionId: paypalOrder.paypal_order_id,
-        payerEmail: paypalOrder.payer_email,
-        redirect_url: paypalOrder.approval_url,
-      },
-    };
-  }
-  
-  private async createOrderCOD(newOrder: Order) {
-    await this.orderRepository.update(newOrder.id, {
-      order_status: OrderStatus.SHIPPED,
-    });
-  
-    this.logger.info({
-      message: 'Order COD created successfully',
-      data: {
-        id: newOrder.id,
-        order_code: newOrder.order_code,
-        payment_method: newOrder.payment_method,
-        pemesanId: newOrder.pemesan.id,
-        amount: newOrder.amount,
-      },
-    });
-  
-    return {
-      message: 'Order COD created successfully',
-      data: {
-        id: newOrder.id,
-        order_code: newOrder.order_code,
-        payment_method: newOrder.payment_method,
-        pemesanId: newOrder.pemesan.id,
-        amount: newOrder.amount,
-      },
-    };
-  }
-  
-
   // create order product
   async createOrder(userId: string, orderReq: OrderRequest): Promise<any> {
     try {
-      const createReq = this.validationService.validate(
-        OrderValidation.CREATEORDER,
-        orderReq,
-      );
-  
+      let createReq: OrderRequest;
+      try {
+        createReq = this.validationService.validate(
+          OrderValidation.CREATEORDER,
+          orderReq,
+        );
+      } catch (error: any) {
+        this.logger.error('Invalid request create order');
+        throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+      }
+      // find user, pemesan, cart, order
       const [findUser, findPemesan, findCart] = await Promise.all([
         this.userRepository.findOne({ where: { id: userId } }),
         this.pemesanRepository.findOne({
-          where: { id: createReq.pemesanId },
+          where: {
+            id: createReq.pemesanId,
+          },
           relations: ['user'],
         }),
         this.cartRepository.find({
@@ -227,95 +169,175 @@ export class OrderService {
           relations: ['product'],
         }),
       ]);
-  
-      if (!findUser || !findPemesan || findCart.length === 0) {
-        throw new HttpException('User/Pemesan/Cart not found', HttpStatus.NOT_FOUND);
+      // check if user or pemesan not found
+      if (!findUser) {
+        this.logger.error('User not found');
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
       }
-  
+      if (!findPemesan) {
+        this.logger.error('Pemesan not found');
+        throw new HttpException('Pemesan not found', HttpStatus.NOT_FOUND);
+      }
+      // check if cart not found
+      if (findCart.length === 0) {
+        this.logger.error('Cart not found');
+        throw new HttpException('Cart not found', HttpStatus.NOT_FOUND);
+      }
+
       const totalPrice = findCart.reduce(
         (sum, cart) => sum + cart.total_price,
         0,
       );
-  
+      console.log('Total Price:', totalPrice); // Debugging
       if (isNaN(totalPrice) || totalPrice <= 0) {
-        throw new HttpException('Total price is invalid', HttpStatus.BAD_REQUEST);
+        throw new HttpException(
+          'Total price is invalid',
+          HttpStatus.BAD_REQUEST,
+        );
       }
-  
+
       const orderCode = `#${await this.generateOrderCode()}`;
       const newOrder = this.orderRepository.create({
         id: this.hashIds.encode(Date.now()),
-        pemesan: { id: findPemesan.id },
-        user: { id: findUser.id },
-        payment_method: createReq.payment_method,
-        shipping_method: createReq.shipping_method,
+        pemesan: {
+          id: findPemesan.id,
+        },
+        user: {
+          id: findUser.id,
+        },
+        payment_method: createReq.payment_method || PaymentMethod.PAYPAL,
+        shipping_method: createReq.shipping_method || ShippingMethod.STANDARD,
         order_code: orderCode,
         carts: findCart,
         amount: totalPrice,
       });
-  
+
       await this.orderRepository.save(newOrder);
-  
-      // Email
+
       const orders = `
-      <div style="margin-bottom: 10px;">
-        <p><strong>Oder Code:#</strong> ${
-          newOrder.order_code
-        }</p>
-        <p><strong>Total Price:#</strong> ${
-          newOrder.amount
-        }</p>
-        <div><strong>List product:</strong> 
-          <ul>
-            ${findCart.map((list:any) => (
-              `<li>
-                 <p><strong>Product Name:</strong> ${list.product.name_product}</p>
-                 <p><strong>Quantity:</strong> ${list.quantity}</p>
-              </li>`
-            ))}
-          </ul>
-        </div>
-        <p><strong>Date:</strong> ${new Date(
-          newOrder.createdAt
-        ).toLocaleDateString("id-ID", {
-          weekday: "short", // "Sun"
-          day: "2-digit", // "12"
-          month: "short", // "Des"
-          year: "numeric", // "2025"
-        })}</p>
-        <hr style="border: 0; border-top: 1px solid #ddd;" />
-      </div>
-      `;
-      
+              <div style="margin-bottom: 10px;">
+                <p><strong>Oder Code:#</strong> ${
+                  newOrder.order_code
+                }</p>
+                <p><strong>Total Price:#</strong> ${
+                  newOrder.amount
+                }</p>
+                <div><strong>List product:</strong> 
+                  <ul>
+                    ${findCart.map((list:any) => (
+                      `<li>
+                         <p><strong>Product Name:</strong> ${list.product.name_product}</p>
+                         <p><strong>Quantity:</strong> ${list.quantity}</p>
+                      </li>`
+                    ))}
+                  </ul>
+                </div>
+                <p><strong>Date:</strong> ${new Date(
+                  newOrder.createdAt
+                ).toLocaleDateString("id-ID", {
+                  weekday: "short", // "Sun"
+                  day: "2-digit", // "12"
+                  month: "short", // "Des"
+                  year: "numeric", // "2025"
+                })}</p>
+                <hr style="border: 0; border-top: 1px solid #ddd;" />
+              </div>
+            `;
+
       await this.sendMailService.sendOrderNotification(EmailOrders.ORDER_PRODUCT, {
-      orderCode: newOrder.order_code,
-      email: findPemesan.email,
-      customerName: findPemesan.name,
-      totalAmount: newOrder.amount,
-      orderDetails: orders,
-      paymentMethod: newOrder.payment_method,
-      paymentStatus: newOrder.payment_status,
-      subjectMessage: `New orders from ${newOrder.pemesan.name}`
+        orderCode: newOrder.order_code,
+        email: findPemesan.email,
+        customerName: findPemesan.name,
+        totalAmount: newOrder.amount,
+        orderDetails: orders,
+        paymentMethod: newOrder.payment_method,
+        paymentStatus: newOrder.payment_status,
+        subjectMessage: `New orders from ${newOrder.pemesan.name}`
       })
-  
-      // Payment handler mapping
-      const paymentHandlers: Record<PaymentMethod, (order: Order, total: number) => Promise<any>> = {
-        [PaymentMethod.PAYPAL]: this.createOrderPaypal.bind(this),
-        [PaymentMethod.COD]: async (order) => this.createOrderCOD(order),
-      };
-  
-      const handlePayment = paymentHandlers[createReq.payment_method];
-  
-      if (!handlePayment) {
-        throw new HttpException('Unsupported payment method', HttpStatus.BAD_REQUEST);
+
+      if (createReq.payment_method === PaymentMethod.PAYPAL) {
+        const paypalOrder = await this.createPayPalOrder(
+          newOrder.id,
+          totalPrice,
+        );
+
+        await this.orderRepository.update(newOrder.id, {
+          transactionId: paypalOrder.paypal_order_id,
+          payerEmail: paypalOrder.payer_email,
+        });
+
+        this.logger.info({
+          message: 'Order paypay created successfully',
+          data: {
+            id: newOrder.id,
+            order_code: newOrder.order_code,
+            payment_method: newOrder.payment_method,
+            pemesanId: newOrder.pemesan.id,
+            amount: newOrder.amount,
+            transactionId: paypalOrder.paypal_order_id,
+            payerEmail: paypalOrder.payer_email,
+            redirect_url: paypalOrder.approval_url,
+          },
+        });
+        return {
+          message: 'Order papay created successfully',
+          data: {
+            id: newOrder.id,
+            order_code: newOrder.order_code,
+            payment_method: newOrder.payment_method,
+            pemesanId: newOrder.pemesan.id,
+            amount: newOrder.amount,
+            transactionId: paypalOrder.paypal_order_id,
+            payerEmail: paypalOrder.payer_email,
+            redirect_url: paypalOrder.approval_url,
+          },
+        };
+      } else if (createReq.payment_method === PaymentMethod.COD) {
+        await this.orderRepository.update(newOrder.id, {
+          order_status: OrderStatus.SHIPPED
+        })
+        
+        this.logger.info({
+          message: 'Order created successfully',
+          data: {
+            id: newOrder.id,
+            order_code: newOrder.order_code,
+            payment_method: newOrder.payment_method,
+            pemesanId: newOrder.pemesan.id,
+            amount: newOrder.amount,
+            order_status: OrderStatus.SHIPPED,
+            payment_status: PaymentStatus.PENDING
+          },
+        });
+        return {
+          message: 'Order papay created successfully',
+          data: {
+            id: newOrder.id,
+            order_code: newOrder.order_code,
+            payment_method: newOrder.payment_method,
+            pemesanId: newOrder.pemesan.id,
+            amount: newOrder.amount,
+            order_status: OrderStatus.SHIPPED,
+            payment_status: PaymentStatus.PENDING
+          },
+        };
+      } else {
+        throw new HttpException(
+          'Invalid payment method',
+          HttpStatus.BAD_REQUEST,
+        );
       }
-  
-      return handlePayment(newOrder, totalPrice);
-    } catch (error) {
-      this.logger.error('Create order failed', error);
-      throw error;
+    } catch (error: any) {
+      this.logger.error('Failed to create order', error.message);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to create order',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
-  
 
   // capture payment paypal
   private async capturePaypalPayment(transactionId: string) {
@@ -785,5 +807,3 @@ export class OrderService {
     return `This action removes a #${id} order`;
   }
 }
-
-
