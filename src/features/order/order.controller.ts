@@ -22,15 +22,30 @@ export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
   // create order product
-  @Post('create_order_product')
+  @Post('create_order_product_paypal')
   @HttpCode(HttpStatus.CREATED)
-  async createOrder(@Req() req:Request, @Body() orderReq: OrderRequest):Promise<any> {
+  async createOrderPaypal(@Req() req:Request, @Body() orderReq: OrderRequest):Promise<any> {
     const user = req['user']
     if(!user){
       throw new HttpException(" Unauthorized", HttpStatus.UNAUTHORIZED)
     }
     const userId = user.id
-    const result = await this.orderService.createOrder(userId, orderReq)
+    const result = await this.orderService.createOrderPaypal(userId, orderReq)
+    return{
+      message: result.message,
+      data: result.data
+    }
+  }
+
+  @Post('create_order_product_cod')
+  @HttpCode(HttpStatus.CREATED)
+  async createOrderCod(@Req() req:Request, @Body() orderReq: OrderRequest):Promise<any> {
+    const user = req['user']
+    if(!user){
+      throw new HttpException(" Unauthorized", HttpStatus.UNAUTHORIZED)
+    }
+    const userId = user.id
+    const result = await this.orderService.createOrderCod(userId, orderReq)
     return{
       message: result.message,
       data: result.data

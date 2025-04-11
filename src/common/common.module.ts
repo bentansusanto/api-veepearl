@@ -199,7 +199,11 @@ export class CommonModule {
         },
         // order
         {
-          path: 'api/v1/create_order_product',
+          path: 'api/v1/create_order_product_paypal',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'api/v1/create_order_product_cod',
           method: RequestMethod.POST,
         },
         {
