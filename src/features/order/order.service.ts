@@ -259,8 +259,8 @@ export class OrderService {
           application_context: {
             // return_url: `http://localhost:8081/checkout`,
             // cancel_url: `http://localhost:8081`,
-            return_url: `${process.env.FRONTEND_URL_DEV}/checkout`,
-            cancel_url: `${process.env.FRONTEND_URL_DEV}`,
+            return_url: `http://localhost:3500/checkout`,
+            cancel_url: `http://localhost:3500`,
             // return_url: `${process.env.FRONTEND_URL}/checkout`,
             // cancel_url: `${process.env.FRONTEND_URL}`,
             shipping_preference: 'NO_SHIPPING',
