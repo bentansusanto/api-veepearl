@@ -60,87 +60,7 @@ export class OrderService {
     }
   }
 
-  // authorization paypal
-  private async authorizationPaypal() {
-    const authResponse = await fetch(
-      `${process.env.PAYPAL_API}/v1/oauth2/token`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${Buffer.from(
-            `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`,
-          ).toString('base64')}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'grant_type=client_credentials',
-      },
-    );
-
-    if (!authResponse.ok) {
-      const errorText = await authResponse.text();
-      throw new Error(`PayPal Auth Error: ${errorText}`);
-    }
-
-    const authData = await authResponse.json();
-    const accessToken = authData.access_token;
-
-    return accessToken;
-  }
-
-  // create paypal order
-  private async payPalOrder(orderId: string, totalPrice: number) {
-    // Dapatkan token akses dari PayPal
-    const accessToken = await this.authorizationPaypal();
-
-    // Buat order di PayPal
-    const orderResponse = await fetch(
-      `${process.env.PAYPAL_API}/v2/checkout/orders`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          intent: 'CAPTURE',
-          purchase_units: [
-            {
-              amount: {
-                currency_code: 'USD',
-                value: totalPrice.toFixed(2),
-              },
-              description: `Order ID: ${orderId}`,
-            },
-          ],
-          application_context: {
-            // return_url: `${process.env.FRONTEND_URL}/checkout/?orderId=${orderId}`,
-            // cancel_url: `${process.env.FRONTEND_URL}`,
-            return_url: `https://veepearls.com/checkout/?orderId=${orderId}`,
-            cancel_url: `https://veepearls.com`,
-            shipping_preference: 'NO_SHIPPING',
-            user_action: 'PAY_NOW',
-            brand_name: 'veepearls.com',
-          },
-        }),
-      },
-    );
-
-    const orderData = await orderResponse.json();
-    if (!orderResponse.ok) {
-      throw new Error(`PayPal Order Error: ${JSON.stringify(orderData)}`);
-    }
-
-    const payerEmail =
-      orderData?.purchase_units?.[0]?.payee?.email_address || null;
-
-    // Return approval link untuk redirect user
-    return {
-      approval_url: orderData.links.find((link: any) => link.rel === 'approve')
-        .href,
-      paypal_order_id: orderData.id,
-      payer_email: payerEmail,
-    };
-  }
+  
 
   private buildOrderHtml(cart: any[], order: Order): string {
     return `
@@ -160,164 +80,6 @@ export class OrderService {
         })}</p>
       </div>
     `;
-  }
-  
-
-  // create order product
-  async createOrderPaypal(userId: string, orderReq: OrderRequest): Promise<any> {
-    try {
-      let createReq: OrderRequest;
-      try {
-        createReq = this.validationService.validate(
-          OrderValidation.CREATEORDER,
-          orderReq,
-        );
-      } catch (error: any) {
-        this.logger.error('Invalid request create order');
-        throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-      }
-      // find user, pemesan, cart, order
-      const [findUser, findPemesan, findCart] = await Promise.all([
-        this.userRepository.findOne({ where: { id: userId } }),
-        this.pemesanRepository.findOne({
-          where: {
-            id: createReq.pemesanId,
-          },
-          relations: ['user'],
-        }),
-        this.cartRepository.find({
-          where: { user: { id: userId } },
-          relations: ['product'],
-        }),
-      ]);
-      // check if user or pemesan not found
-      if (!findUser) {
-        this.logger.error('User not found');
-        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-      }
-      if (!findPemesan) {
-        this.logger.error('Pemesan not found');
-        throw new HttpException('Pemesan not found', HttpStatus.NOT_FOUND);
-      }
-      // check if cart not found
-      if (findCart.length === 0) {
-        this.logger.error('Cart not found');
-        throw new HttpException('Cart not found', HttpStatus.NOT_FOUND);
-      }
-
-      const totalPrice = findCart.reduce(
-        (sum, cart) => sum + cart.total_price,
-        0,
-      );
-      console.log('Total Price:', totalPrice); // Debugging
-      if (isNaN(totalPrice) || totalPrice <= 0) {
-        throw new HttpException(
-          'Total price is invalid',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      const orderCode = `#${await this.generateOrderCode()}`;
-      const newOrder = this.orderRepository.create({
-        id: this.hashIds.encode(Date.now()),
-        pemesan: {
-          id: findPemesan.id,
-        },
-        user: {
-          id: findUser.id,
-        },
-        payment_method: PaymentMethod.PAYPAL,
-        shipping_method: createReq.shipping_method || ShippingMethod.STANDARD,
-        order_code: orderCode,
-        carts: findCart,
-        amount: totalPrice,
-      });
-
-      await this.orderRepository.save(newOrder);
-
-      // const orders = `
-      //         <div style="margin-bottom: 10px;">
-      //           <p><strong>Oder Code:#</strong> ${
-      //             newOrder.order_code
-      //           }</p>
-      //           <p><strong>Total Price:#</strong> ${
-      //             newOrder.amount
-      //           }</p>
-      //           <div><strong>List product:</strong> 
-      //             <ul>
-      //               ${findCart.map((list:any) => (
-      //                 `<li>
-      //                    <p><strong>Product Name:</strong> ${list.product.name_product}</p>
-      //                    <p><strong>Quantity:</strong> ${list.quantity}</p>
-      //                 </li>`
-      //               ))}
-      //             </ul>
-      //           </div>
-      //           <p><strong>Date:</strong> ${new Date(
-      //             newOrder.createdAt
-      //           ).toLocaleDateString("id-ID", {
-      //             weekday: "short", // "Sun"
-      //             day: "2-digit", // "12"
-      //             month: "short", // "Des"
-      //             year: "numeric", // "2025"
-      //           })}</p>
-      //           <hr style="border: 0; border-top: 1px solid #ddd;" />
-      //         </div>
-      //       `;
-
-      await this.sendMailService.sendOrderNotification(EmailOrders.ORDER_PRODUCT, {
-        orderCode: newOrder.order_code,
-        email: findPemesan.email,
-        customerName: findPemesan.name,
-        totalAmount: newOrder.amount,
-        orderDetails: this.buildOrderHtml(findCart, newOrder),
-        paymentMethod: newOrder.payment_method,
-        paymentStatus: newOrder.payment_status,
-        subjectMessage: `New orders from ${newOrder.pemesan.name}`
-      })
-
-      const paypalOrder = await this.payPalOrder(
-        newOrder.id,
-        totalPrice,
-      );
-
-      this.logger.info({
-        message: 'Order paypay created successfully',
-        data: {
-          id: newOrder.id,
-          order_code: newOrder.order_code,
-          payment_method: newOrder.payment_method,
-          pemesanId: newOrder.pemesan.id,
-          amount: newOrder.amount,
-          transactionId: paypalOrder.paypal_order_id,
-          payerEmail: paypalOrder.payer_email,
-          redirect_url: paypalOrder.approval_url,
-        },
-      });
-      return {
-        message: 'Order papay created successfully',
-        data: {
-          id: newOrder.id,
-          order_code: newOrder.order_code,
-          payment_method: newOrder.payment_method,
-          pemesanId: newOrder.pemesan.id,
-          amount: newOrder.amount,
-          transactionId: paypalOrder.paypal_order_id,
-          payerEmail: paypalOrder.payer_email,
-          redirect_url: paypalOrder.approval_url,
-        },
-      };
-      
-    } catch (error: any) {
-      this.logger.error('Failed to create order', error.message);
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        error.message || 'Failed to create order',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
   }
 
   async createOrderCod(userId: string, orderReq: OrderRequest): Promise<any> {
@@ -442,78 +204,349 @@ export class OrderService {
     }
   }
 
-  // capture payment paypal
-  private async capturePaypalPayment(transactionId: string) {
+  // authorization paypal
+  private async authorizationPaypal() {
+    const authResponse = await fetch(
+      `${process.env.PAYPAL_API}/v1/oauth2/token`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${Buffer.from(
+            `${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`,
+          ).toString('base64')}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'grant_type=client_credentials',
+      },
+    );
+
+    if (!authResponse.ok) {
+      const errorText = await authResponse.text();
+      throw new Error(`PayPal Auth Error: ${errorText}`);
+    }
+
+    const authData = await authResponse.json();
+    const accessToken = authData.access_token;
+
+    return accessToken;
+  }
+
+  // create paypal order
+  private async payPalOrder(orderId: string, totalPrice: number) {
+    // Dapatkan token akses dari PayPal
     const accessToken = await this.authorizationPaypal();
-    const captureResponse = await fetch(
-      `${process.env.PAYPAL_API}/v2/checkout/orders/${transactionId}/capture`,
+
+    // Buat order di PayPal
+    const orderResponse = await fetch(
+      `${process.env.PAYPAL_API}/v2/checkout/orders`,
       {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          intent: 'CAPTURE',
+          purchase_units: [
+            {
+              amount: {
+                currency_code: 'USD',
+                value: totalPrice.toFixed(2),
+              },
+              description: `Order ID: ${orderId}`,
+            },
+          ],
+          application_context: {
+            // return_url: `http://localhost:8081/checkout`,
+            // cancel_url: `http://localhost:8081`,
+            return_url: `${process.env.FRONTEND_URL_DEV}/checkout`,
+            cancel_url: `${process.env.FRONTEND_URL_DEV}`,
+            // return_url: `https://veepearls.com/checkout`,
+            // cancel_url: `https://veepearls.com`,
+            shipping_preference: 'NO_SHIPPING',
+            user_action: 'PAY_NOW',
+            brand_name: 'localhost:3500',
+          },
+        }),
       },
     );
-    const captureData = await captureResponse.json();
-  console.log('📦 PayPal Capture Response:', JSON.stringify(captureData, null, 2));
 
-    if (captureData.status !== 'COMPLETED') {
-      throw new Error('Payment capture not completed');
+    const orderData = await orderResponse.json();
+    if (!orderResponse.ok) {
+      throw new Error(`PayPal Order Error: ${JSON.stringify(orderData)}`);
     }
 
-    // Step 4: Extract payer email from response
-    const payerEmail = captureData.payer?.email_address || null;
-    console.log(payerEmail)
+    const payerEmail =
+      orderData?.purchase_units?.[0]?.payee?.email_address || null;
 
+    // Return approval link untuk redirect user
     return {
-      payerEmail,
+      approval_url: orderData.links.find((link: any) => link.rel === 'approve')
+        .href,
+      paypal_order_id: orderData.id,
+      payer_email: payerEmail,
+      orderData
     };
   }
 
-  // capture payment
-  async capturePayment(userId: string, transactionId: string): Promise<any> {
+  // create order product
+  async createOrderPaypal(userId: string, orderReq: OrderRequest): Promise<any> {
     try {
-      const capture = await this.capturePaypalPayment(transactionId);
-      const findOrder = await this.orderRepository.findOne({
-        where: {
-          user: {
-            id: userId,
+      let createReq: OrderRequest;
+      try {
+        createReq = this.validationService.validate(
+          OrderValidation.CREATEORDER,
+          orderReq,
+        );
+      } catch (error: any) {
+        this.logger.error('Invalid request create order');
+        throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+      }
+      // find user, pemesan, cart, order
+      const [findUser, findPemesan, findCart] = await Promise.all([
+        this.userRepository.findOne({ where: { id: userId } }),
+        this.pemesanRepository.findOne({
+          where: {
+            id: createReq.pemesanId,
           },
-          transactionId,
-        },
-        relations: ['user'],
-      });
-      if (!findOrder || findOrder.user.id !== userId) {
-        this.logger.error('Order not found or user not match');
+          relations: ['user'],
+        }),
+        this.cartRepository.find({
+          where: { user: { id: userId } },
+          relations: ['product'],
+        }),
+      ]);
+      // check if user or pemesan not found
+      if (!findUser) {
+        this.logger.error('User not found');
+        throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+      }
+      if (!findPemesan) {
+        this.logger.error('Pemesan not found');
+        throw new HttpException('Pemesan not found', HttpStatus.NOT_FOUND);
+      }
+      // check if cart not found
+      if (findCart.length === 0) {
+        this.logger.error('Cart not found');
+        throw new HttpException('Cart not found', HttpStatus.NOT_FOUND);
+      }
+
+      const totalPrice = findCart.reduce(
+        (sum, cart) => sum + cart.total_price,
+        0,
+      );
+      console.log('Total Price:', totalPrice); // Debugging
+      if (isNaN(totalPrice) || totalPrice <= 0) {
         throw new HttpException(
-          'Order not found or user not match',
-          HttpStatus.NOT_FOUND,
+          'Total price is invalid',
+          HttpStatus.BAD_REQUEST,
         );
       }
 
-      // get data from capture
-      findOrder.payerEmail = capture.payerEmail;
-      const result = await this.orderRepository.save(findOrder);
-      return {
-        message: 'Payment captured successfully',
+      const orderCode = `#${await this.generateOrderCode()}`;
+      const newOrder = this.orderRepository.create({
+        id: this.hashIds.encode(Date.now()),
+        pemesan: {
+          id: findPemesan.id,
+        },
+        user: {
+          id: findUser.id,
+        },
+        payment_method: PaymentMethod.PAYPAL,
+        shipping_method: createReq.shipping_method || ShippingMethod.STANDARD,
+        order_code: orderCode,
+        carts: findCart,
+        amount: totalPrice ,
+      });
+
+      await this.orderRepository.save(newOrder);
+      // const orders = `
+      //         <div style="margin-bottom: 10px;">
+      //           <p><strong>Oder Code:#</strong> ${
+      //             newOrder.order_code
+      //           }</p>
+      //           <p><strong>Total Price:#</strong> ${
+      //             newOrder.amount
+      //           }</p>
+      //           <div><strong>List product:</strong> 
+      //             <ul>
+      //               ${findCart.map((list:any) => (
+      //                 `<li>
+      //                    <p><strong>Product Name:</strong> ${list.product.name_product}</p>
+      //                    <p><strong>Quantity:</strong> ${list.quantity}</p>
+      //                 </li>`
+      //               ))}
+      //             </ul>
+      //           </div>
+      //           <p><strong>Date:</strong> ${new Date(
+      //             newOrder.createdAt
+      //           ).toLocaleDateString("id-ID", {
+      //             weekday: "short", // "Sun"
+      //             day: "2-digit", // "12"
+      //             month: "short", // "Des"
+      //             year: "numeric", // "2025"
+      //           })}</p>
+      //           <hr style="border: 0; border-top: 1px solid #ddd;" />
+      //         </div>
+      //       `;
+
+      await this.sendMailService.sendOrderNotification(EmailOrders.ORDER_PRODUCT, {
+        orderCode: newOrder.order_code,
+        email: findPemesan.email,
+        customerName: findPemesan.name,
+        totalAmount: newOrder.amount,
+        orderDetails: this.buildOrderHtml(findCart, newOrder),
+        paymentMethod: newOrder.payment_method,
+        paymentStatus: newOrder.payment_status,
+        subjectMessage: `New orders from ${newOrder.pemesan.name}`
+      })
+
+      const paypalOrder = await this.payPalOrder(
+        newOrder.id,
+        totalPrice,
+      );
+
+      await this.orderRepository.update(newOrder.id,{
+        transactionId: paypalOrder.paypal_order_id
+      })
+
+      this.logger.info({
+        message: 'Order paypay created successfully',
         data: {
-          id: result.id,
-          payerEmail: result.payerEmail,
-          transactionId: result.transactionId,
+          id: newOrder.id,
+          order_code: newOrder.order_code,
+          payment_method: newOrder.payment_method,
+          pemesanId: newOrder.pemesan.id,
+          amount: newOrder.amount,
+          transactionId: paypalOrder.paypal_order_id,
+          payerEmail: paypalOrder.payer_email,
+          redirect_url: paypalOrder.approval_url,
+        },
+      });
+      return {
+        message: 'Order papay created successfully',
+        data: {
+          id: newOrder.id,
+          order_code: newOrder.order_code,
+          payment_method: newOrder.payment_method,
+          pemesanId: newOrder.pemesan.id,
+          amount: newOrder.amount,
+          transactionId: paypalOrder.paypal_order_id,
+          payerEmail: paypalOrder.payer_email,
+          redirect_url: paypalOrder.approval_url,
+          orderData: paypalOrder.orderData
         },
       };
+      
     } catch (error: any) {
-      this.logger.error('Failed to capture payment');
+      this.logger.error('Failed to create order', error.message);
       if (error instanceof HttpException) {
         throw error;
       }
       throw new HttpException(
-        error.stack || 'Failed to capture payment',
+        error.message || 'Failed to create order',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
+
+ // capture payment paypal
+ private async capturePaypalPayment(transactionId: string) {
+  const accessToken = await this.authorizationPaypal();
+
+  const captureResponse = await fetch(
+    `${process.env.PAYPAL_API}/v2/checkout/orders/${transactionId}/capture`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    },
+  );
+
+  const captureData = await captureResponse.json();
+
+  console.log('📦 PayPal Capture Response:', JSON.stringify(captureData, null, 2));
+
+  // Jika response error dari PayPal
+  if (!captureResponse.ok) {
+    const issue = captureData?.details?.[0]?.issue;
+    const description = captureData?.details?.[0]?.description || captureData?.message;
+
+    // Khusus: tangani error ketika sudah terlalu banyak mencoba
+    if (issue === 'MAX_NUMBER_OF_PAYMENT_ATTEMPTS_EXCEEDED') {
+      throw new Error(
+        'This order has already been attempted too many times. Please create a new order to try again.'
+      );
+    }
+
+    throw new Error(`PayPal API error: ${description}`);
+  }
+
+  if (captureData.status !== 'COMPLETED') {
+    throw new Error(`Payment not completed, status: ${captureData.status}`);
+  }
+
+  const payerEmail = captureData.payer?.email_address || null;
+
+  return {
+    payerEmail,
+    status: captureData.status,
+    raw: captureData,
+  };
+}
+
+// capture payment
+async capturePayment(userId: string, transactionId: string): Promise<any> {
+  try {
+    const capture = await this.capturePaypalPayment(transactionId);
+
+    const findOrder = await this.orderRepository.findOne({
+      where: {
+        user: { id: userId },
+        transactionId,
+      },
+      relations: ['user'],
+    });
+
+    if (!findOrder || findOrder.user.id !== userId) {
+      this.logger.error('Order not found or user not match');
+      throw new HttpException(
+        'Order not found or user not match',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    findOrder.payerEmail = capture.payerEmail;
+    findOrder.order_status = OrderStatus.SHIPPED;
+    findOrder.payment_status = PaymentStatus.COMPLETED;
+    const result = await this.orderRepository.save(findOrder);
+
+    return {
+      message: 'Payment captured successfully',
+      data: {
+        id: result.id, 
+        payerEmail: result.payerEmail,
+        order_status: result.order_status,
+        payment_status: result.payment_status,
+        transactionId: result.transactionId,
+        status: capture.status,
+      },
+    };
+  } catch (error: any) {
+    this.logger.error(`Failed to capture payment: ${error.message}`);
+
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
+    throw new HttpException(
+      error.message || 'Failed to capture payment',
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+}
 
   // verify payment paypal
   async verifyPaypalPayment(userId: string, token: string): Promise<any> {
@@ -556,7 +589,44 @@ export class OrderService {
           },
           transactionId: token,
         },
-        relations: ['user', 'pemesan'],
+        relations: ['user', 'pemesan', 'carts', 'carts.product'],
+        select: {
+          id: true,
+          user: {
+            id: true,
+          },
+          transactionId: true,
+          order_status: true,
+          payment_status: true,
+          order_code: true,
+          amount: true,
+          pemesan: {
+            id: true,
+            name: true,
+            email: true,
+            address: true,
+            phone: true,
+            city: true,
+            country: true,
+            zip_code: true,
+          },
+          carts: {
+            id: true,
+            product: {
+              id: true,
+              name_product: true,
+              thumbnail: true,
+              sku: true,
+              grade: true,
+            },
+            quantity: true,
+            total_price: true,
+          },
+          shipping_method: true,
+          payment_method: true,
+          createdAt: true,
+          updatedAt: true,
+        }
       });
       if (!findOrder || findOrder.user.id !== userId) {
         this.logger.error("Order not found or user doesn't match");
@@ -565,10 +635,6 @@ export class OrderService {
           HttpStatus.NOT_FOUND,
         );
       }
-
-      findOrder.payment_status = PaymentStatus.COMPLETED;
-      findOrder.order_status = OrderStatus.SHIPPED;
-       await this.orderRepository.save(findOrder);
 
       await this.sendMailService.sendOrderNotification(EmailOrders.PAYMENT_STATUS,{
         subjectMessage: `Status Payment Successfully`,
@@ -587,6 +653,7 @@ export class OrderService {
           order_code: findOrder.order_code,
           amount: findOrder.amount,
           pemesanId: findOrder.user.id,
+          carts: findOrder.carts, 
           order_status: findOrder.order_status,
           payment_method: findOrder.payment_method,
           payment_status: findOrder.payment_status,
@@ -598,19 +665,7 @@ export class OrderService {
       });
       return {
         message: `Order status updated to shipped for user ${userId}`,
-        data: {
-          id: findOrder.id,
-          order_code: findOrder.order_code,
-          amount: findOrder.amount,
-          pemesanId: findOrder.user.id,
-          order_status: findOrder.order_status,
-          payment_method: findOrder.payment_method,
-          payment_status: findOrder.payment_status,
-          transactionId: findOrder.transactionId,
-          shipping_method: findOrder.shipping_method,
-          createdAt: findOrder.createdAt,
-          updatedAt: findOrder.updatedAt,
-        },
+        data: findOrder
       };
     } catch (error: any) {
       this.logger.error('Failed to verify payment paypal', error.message);

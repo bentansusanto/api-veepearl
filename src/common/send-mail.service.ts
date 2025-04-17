@@ -4,6 +4,7 @@ import nodemailer from 'nodemailer';
 import { Logger } from 'winston';
 import { EmailOrders, EmailType } from './subject-email.config';
 import { SendMailOptions, SendOrderProduct } from '../models/send-mail.model';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 @Injectable()
 export class SendMailService {
@@ -11,14 +12,22 @@ export class SendMailService {
     @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
   ) {}
   private transporter = nodemailer.createTransport({
-    host: 'mail.veepearls.com',
+    host: 'srv140.niagahoster.com',
     port: 465,
     secure: true,
     auth: {
-      user: process.env.USERNAME ?? "sales@veepearls.com", // Pastikan sesuai dengan email CPanel
-      pass: process.env.PASSWORD ?? "Office123456!",
+      user: process.env.USERNAME ?? 'sales@veepearls.com',
+      pass: process.env.PASSWORD,
     },
-  });
+    tls: {
+      rejectUnauthorized: false,
+    },
+    family: 4,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  }as SMTPTransport.Options);
+  
 
   async sendMail(type: EmailType, options: SendMailOptions) {
     const { email, otpCode, subjectMessage } = options;
@@ -124,7 +133,7 @@ export class SendMailService {
           <div style="font-family: Arial, sans-serif; text-align: center;">
             <p>${subjectMessage}</p>
             <p>Payment Status: <strong>${paymentStatus}</strong></p>
-            <p><strong>Total: $${totalAmount.toLocaleString("en-EN")}</strong></p>
+            <p><strong>Total: $${totalAmount.toLocaleString('en-EN')}</strong></p>
             <p>Thank you for your payment.</p>
           </div>`;
         break;
@@ -154,17 +163,21 @@ export class SendMailService {
           : `Payment Status - ${orderCode}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
-          <h2 style="color: #d9534f;">${type === EmailOrders.ORDER_PRODUCT ? "New Orders" : "Payment Status"}</h2>
+          <h2 style="color: #d9534f;">${type === EmailOrders.ORDER_PRODUCT ? 'New Orders' : 'Payment Status'}</h2>
           <p><strong>Details:</strong></p>
           <ul>
             <li><strong>Order ID:</strong> ${orderCode}</li>
             <li><strong>Customer:</strong> ${customerName}</li>
-            <li><strong>Total Payment:</strong> $${totalAmount.toLocaleString("en-EN")}</li>
+            <li><strong>Total Payment:</strong> $${totalAmount.toLocaleString('en-EN')}</li>
             <li><strong>Payment Method:</strong> ${paymentMethod}</li>
             ${type === EmailOrders.PAYMENT_STATUS ? `<li><strong>Payment Status:</strong> ${paymentStatus}</li>` : ''}
           </ul>
-          ${type === EmailOrders.ORDER_PRODUCT ? `<h3>Order Details:</h3>
-          <div style="background: #f9f9f9; padding: 10px; border-radius: 5px;">${orderDetails}</div>` : ''}
+          ${
+            type === EmailOrders.ORDER_PRODUCT
+              ? `<h3>Order Details:</h3>
+          <div style="background: #f9f9f9; padding: 10px; border-radius: 5px;">${orderDetails}</div>`
+              : ''
+          }
           <p>${type === EmailOrders.ORDER_PRODUCT ? `The order is being processed for ${customerName}` : `The payment has been updated`}</p>
           <hr/>
           <p style="font-size: 12px; color: #777;">This is an automated email, please do not reply.</p>
