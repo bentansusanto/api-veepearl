@@ -1,10 +1,10 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import nodemailer from 'nodemailer';
-import { Logger } from 'winston';
-import { EmailOrders, EmailType } from './subject-email.config';
-import { SendMailOptions, SendOrderProduct } from '../models/send-mail.model';
 import SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { Logger } from 'winston';
+import { SendMailOptions, SendOrderProduct } from '../models/send-mail.model';
+import { EmailOrders, EmailType } from './subject-email.config';
 
 @Injectable()
 export class SendMailService {
@@ -12,11 +12,11 @@ export class SendMailService {
     @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
   ) {}
   private transporter = nodemailer.createTransport({
-    host: 'srv140.niagahoster.com',
+    host: process.env.EMAIL_HOST || 'mail.pacifictravelindo.com',
     port: 465,
     secure: true,
     auth: {
-      user: process.env.USERNAME ?? 'sales@veepearls.com',
+      user: process.env.USERNAME,
       pass: process.env.PASSWORD,
     },
     tls: {
@@ -26,8 +26,7 @@ export class SendMailService {
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000,
-  }as SMTPTransport.Options);
-  
+  } as SMTPTransport.Options);
 
   async sendMail(type: EmailType, options: SendMailOptions) {
     const { email, otpCode, subjectMessage } = options;

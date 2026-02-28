@@ -310,12 +310,21 @@ export class ProductService {
         this.productRepository.findOne({
           where: {
             id: productId,
-          },
+          }, 
+          relations: ['carts'],  
         }),
       ]);
       if (!findAdmin || !findProduct) {
         this.logger.error('User is not admin or Product not found');
         throw new HttpException('User is not admin or Product not found', HttpStatus.FORBIDDEN);
+      }
+      // check product has cart
+      if (findProduct.carts && findProduct.carts.length > 0) {
+        this.logger.error(`Product ${productId} is currently in a cart and cannot be deleted`);
+        throw new HttpException(
+          'This product is currently in a customer cart and cannot be deleted',
+          HttpStatus.BAD_REQUEST
+        );
       }
       // delete product
       await this.productRepository.remove(findProduct);

@@ -1,5 +1,3 @@
-import { Order } from '../../../features/order/entities/order.entity';
-import { Cart } from '../../../features/cart/entities/cart.entity';
 import {
   Column,
   CreateDateColumn,
@@ -8,7 +6,10 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { Cart } from '../../../features/cart/entities/cart.entity';
+import { Order } from '../../../features/order/entities/order.entity';
 import { Pemesan } from '../../../features/pemesan/entities/pemesan.entity';
+import { UserSessions } from './user_session.entity';
 
 export enum UserRole {
   CUSTOMER = 'customer',
@@ -23,17 +24,11 @@ export class User {
   @Column()
   name: string;
 
-  @Column({unique: true})
+  @Column({ unique: true })
   email: string;
 
   @Column()
   password: string;
-
-  @Column({ nullable: true })
-  otpCode?: string;
-
-  @Column({ nullable: true, type: 'timestamp' })
-  expOtp?: Date;
 
   @Column({
     type: 'enum',
@@ -42,17 +37,20 @@ export class User {
   })
   role: UserRole;
 
-  @Column({ nullable: true })
-  authToken: string;
-
-  @Column({ nullable: true })
-  accToken: string;
-
   @Column({ default: false })
   isVerified: boolean;
 
+  @Column({ nullable: true })
+  verifyToken: string;
+
   @Column({ nullable: true, type: 'timestamp' })
-  expAccAt: Date;
+  expireVerifyToken: Date;
+
+  @Column({ nullable: true, default: true })
+  isActive: boolean;
+
+  @OneToMany(() => UserSessions, (session) => session.user)
+  sessions: UserSessions[];
 
   @OneToMany(() => Cart, (cart) => cart.user)
   carts: Cart[];

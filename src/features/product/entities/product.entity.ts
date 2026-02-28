@@ -1,58 +1,67 @@
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryColumn, UpdateDateColumn } from "typeorm";
-import { Jeweltype } from "../jeweltype/entities/jeweltype.entity";
-import { Cart } from "../../../features/cart/entities/cart.entity";
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { Cart } from '../../../features/cart/entities/cart.entity';
+import { Jeweltype } from '../jeweltype/entities/jeweltype.entity';
 
 @Entity('product')
 export class Product {
-    @PrimaryColumn()
-    id: string;
+  @PrimaryColumn()
+  id: string;
 
-    @ManyToOne(() => Jeweltype, (jeweltype) => jeweltype.products)
-    @JoinColumn({ name: 'jeweltypeId' })
-    jeweltype: Jeweltype;
+  @ManyToOne(() => Jeweltype, (jeweltype) => jeweltype.products)
+  @JoinColumn({ name: 'jeweltypeId' })
+  jeweltype: Jeweltype;
 
-    @OneToMany(() => Cart, (cart) => cart.product)
-    carts: Cart[];
+  @OneToMany(() => Cart, (cart) => cart.product, { onDelete: 'CASCADE' })
+  carts: Cart[];
 
-    @Column()
-    name_product: string
+  @Column()
+  name_product: string;
 
-    @Column()
-    slug: string;
+  @Column()
+  slug: string;
 
-    @Column({type: 'float'})
-    price: number;
+  @Column({ type: 'float' })
+  price: number;
 
-    @Column()
-    description: string;
+  @Column()
+  description: string;
 
-    @Column()
-    grade: string;
+  @Column()
+  grade: string;
 
-    @Column({unique: true})
-    sku: string;
+  @Column({ unique: true })
+  sku: string;
 
-    @Column({nullable: true})
-    size: string;
+  @Column({ nullable: true })
+  size: string;
 
-    @Column()
-    thumbnail: string;
+  @Column()
+  thumbnail: string;
 
-    @Column({default: true})
-    stock_ready: boolean;
+  @Column({ default: true })
+  stock_ready: boolean;
 
-    @Column({default: false})
-    popular: boolean;
+  @Column({ default: false })
+  popular: boolean;
 
-    @Column({type: 'json'})
-    images: string[];
+  @Column({ type: 'json' })
+  images: string[];
 
-    @Column({type: 'json', nullable: true})
-    video: string[];
+  @Column({ type: 'json', nullable: true })
+  video?: string[];
 
-    @CreateDateColumn()
-    createdAt: Date;
+  @CreateDateColumn()
+  createdAt: Date;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

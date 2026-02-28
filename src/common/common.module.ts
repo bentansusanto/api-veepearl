@@ -4,22 +4,22 @@ import {
   Module,
   RequestMethod,
 } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { WinstonModule } from 'nest-winston';
 import winston from 'winston';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { ValidationService } from './validation.service';
-import { APP_FILTER } from '@nestjs/core';
-import { ErrorFilter } from './error.config';
-import { SendMailService } from './send-mail.service';
 import { User } from '../features/auth/entities/auth.entity';
-import { AuthMiddleware } from './middleware';
+import { Cart } from '../features/cart/entities/cart.entity';
+import { Order } from '../features/order/entities/order.entity';
+import { Pemesan } from '../features/pemesan/entities/pemesan.entity';
 import { Product } from '../features/product/entities/product.entity';
 import { Jeweltype } from '../features/product/jeweltype/entities/jeweltype.entity';
-import { Cart } from '../features/cart/entities/cart.entity';
-import { Pemesan } from '../features/pemesan/entities/pemesan.entity';
-import { Order } from '../features/order/entities/order.entity';
+import { ErrorFilter } from './error.config';
+import { AuthMiddleware } from './middleware';
+import { SendMailService } from './send-mail.service';
+import { ValidationService } from './validation.service';
 @Global()
 @Module({
   imports: [
@@ -47,8 +47,16 @@ import { Order } from '../features/order/entities/order.entity';
         password: configService.get<string>('DB_PASS') || 'Veepearls01!',
         database: configService.get<string>('DB_NAME'),
         autoLoadEntities: true,
-        synchronize: configService.get<string>('NODE_ENV') === 'development',
+        synchronize: configService.get<string>('NODE_ENV') === 'production',
+        // synchronize: configService.get<string>('NODE_ENV') === 'development',
         charset: 'utf8mb4',
+        ssl: false,
+        extra: {
+          connectionLimit: 10,
+          ssl: false,
+        },
+        connectTimeout: 60000,
+        // logging: true,
       }),
     }),
     TypeOrmModule.forFeature([User, Product, Jeweltype, Cart, Pemesan, Order]),
@@ -216,6 +224,14 @@ export class CommonModule {
         },
         {
           path: 'api/v1/verify_payment_cod/:id',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'api/v1/create_order_product_card',
+          method: RequestMethod.POST,
+        },
+        {
+          path: 'api/v1/capture_payment_card',
           method: RequestMethod.POST,
         },
         {
