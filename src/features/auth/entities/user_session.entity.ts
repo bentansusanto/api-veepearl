@@ -23,7 +23,10 @@ export class UserSessions {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column()
+  @Column({ name: 'access_token', nullable: true })
+  access_token: string;
+
+  @Column({ name: 'refresh_token' })
   ref_token: string;
 
   @Column()

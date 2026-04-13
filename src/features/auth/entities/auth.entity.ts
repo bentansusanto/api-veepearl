@@ -2,6 +2,8 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryColumn,
   UpdateDateColumn,
@@ -11,10 +13,7 @@ import { Order } from '../../../features/order/entities/order.entity';
 import { Pemesan } from '../../../features/pemesan/entities/pemesan.entity';
 import { UserSessions } from './user_session.entity';
 
-export enum UserRole {
-  CUSTOMER = 'customer',
-  ADMIN = 'admin',
-}
+import { Role } from './role.entity';
 
 @Entity('user')
 export class User {
@@ -30,12 +29,11 @@ export class User {
   @Column()
   password: string;
 
-  @Column({
-    type: 'enum',
-    enum: UserRole,
-    default: UserRole.CUSTOMER,
+  @ManyToOne(() => Role, (role) => role.users, {
+    eager: true,
   })
-  role: UserRole;
+  @JoinColumn({ name: 'role_id' })
+  role: Role;
 
   @Column({ default: false })
   isVerified: boolean;
@@ -45,6 +43,12 @@ export class User {
 
   @Column({ nullable: true, type: 'timestamp' })
   expireVerifyToken: Date;
+
+  @Column({ nullable: true })
+  passwordResetToken: string;
+
+  @Column({ nullable: true, type: 'timestamp' })
+  passwordResetExpire: Date;
 
   @Column({ nullable: true, default: true })
   isActive: boolean;

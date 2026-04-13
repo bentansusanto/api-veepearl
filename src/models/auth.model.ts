@@ -1,14 +1,28 @@
-import { UserRole } from '../features/auth/entities/auth.entity';
+import { ResponseModel } from "./index.model";
 
 export class RegisterRequest {
   name: string;
   email: string;
   password: string;
-  role?: UserRole;
+  roleId?: number;
+  roleName?: string;
 }
 
-export class VerifyOtp {
-  otpCode: string;
+export class AuthData {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  createdAt: Date;
+  updatedAt: Date;
+  sessiontoken?: string;
+  access_token?: string;
+}
+
+export class AuthResponse extends ResponseModel<AuthData>{
+  message: string;
+  data?: AuthData;
+  datas?: AuthData[];
 }
 
 export class LoginRequest {
@@ -16,18 +30,18 @@ export class LoginRequest {
   password: string;
 }
 
-export class VerifyAccount {
-  otpCode: string;
-  email: string;
+export class VerifyAccountRequest {
+  email?: string;
+  token: string;
 }
 
-export class CheckEmail {
+export class ForgotPasswordRequest {
   email: string;
 }
 
 export class ResetPasswordRequest {
-  email: string;
+  email?: string;
+  token: string;
   password: string;
   retryPassword: string;
-  otpCode: string;
 }

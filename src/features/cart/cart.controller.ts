@@ -8,48 +8,44 @@ import {
   HttpStatus,
   HttpCode,
   Req,
-  HttpException,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { Request } from 'express';
 import { CartRequest, UpdateCartRequest } from '../../models/cart.model';
-
+import { AuthGuard } from '../../common/guards/auth.guard';
 
 @Controller('api/v1/')
+@UseGuards(AuthGuard)
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
   // add cart
   @Post('add_cart')
   @HttpCode(HttpStatus.CREATED)
-  async createCart(@Req() req:Request, @Body() cartReq: CartRequest):Promise<any>  {
-    const user = req['user']
-    if(!user){
-      throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED)
-    }
-    const userId = user.id
-    const result = await this.cartService.addCart(userId, cartReq)
-    return{
+  async createCart(
+    @Req() req: Request,
+    @Body() cartReq: CartRequest,
+  ): Promise<any> {
+    const userId = req['user'].id;
+    const result = await this.cartService.addCart(userId, cartReq);
+    return {
       message: result.message,
       data: result.data,
-    }
+    };
   }
 
   // find all products in cart by use
   @Get('find_cart')
   @HttpCode(HttpStatus.OK)
-  async findCart(@Req() req:Request):Promise<any> {
-    const user = req['user']
-    if(!user){
-      throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED)
-    }
-    const userId = user.id
-    const result = await this.cartService.findCart(userId)
-    return{
+  async findCart(@Req() req: Request): Promise<any> {
+    const userId = req['user'].id;
+    const result = await this.cartService.findCart(userId);
+    return {
       message: result.message,
       data: result.data,
-    }
+    };
   }
 
   // find cart by id
@@ -60,30 +56,29 @@ export class CartController {
 
   @Put('update_product_cart/:id')
   @HttpCode(HttpStatus.OK)
-  async updatedCart(@Req() req: Request, @Param('id') cartId: string,  @Body() updateReq: UpdateCartRequest):Promise<any>  {
-    const user = req['user']
-    if(!user){
-      throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED)
-    }
-    const userId = user.id
-    const result = await this.cartService.updateCart(userId, cartId, updateReq)
-    return{
+  async updatedCart(
+    @Req() req: Request,
+    @Param('id') cartId: string,
+    @Body() updateReq: UpdateCartRequest,
+  ): Promise<any> {
+    const userId = req['user'].id;
+    const result = await this.cartService.updateCart(userId, cartId, updateReq);
+    return {
       message: result.message,
       data: result.data,
-    }
+    };
   }
 
   @Delete('remove_product_cart/:id')
   @HttpCode(HttpStatus.OK)
-  async removeCart(@Req() req: Request, @Param('id') cartId: string):Promise<any>   {
-    const user = req['user']
-    if(!user){
-      throw new HttpException("Unauthorized", HttpStatus.UNAUTHORIZED)
-    }
-    const userId = user.id
-    const result = await this.cartService.removeFromCart(userId, cartId)
-    return{
+  async removeCart(
+    @Req() req: Request,
+    @Param('id') cartId: string,
+  ): Promise<any> {
+    const userId = req['user'].id;
+    const result = await this.cartService.removeFromCart(userId, cartId);
+    return {
       message: result.message,
-    }
+    };
   }
 }

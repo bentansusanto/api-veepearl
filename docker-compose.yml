@@ -11,10 +11,9 @@ services:
       - DB_USER=veepearldb
       - DB_PASS=root
       - DB_NAME=veepearl_db
-      - DB_HOST=localhost
       - DB_ROOT_PASSWORD=root
     ports:
-      - "8082:8082"
+      - "8084:8084"
     volumes:
       - .:/app
       - /app/node_modules
@@ -27,14 +26,14 @@ services:
   mysql:
     image: mysql:8.0.1
     container_name: veepearlapp
-    command: --default-authentication-plugin=mysql_native_password
+    command: --default-authentication-plugin=mysql_native_password --port=3307
     restart: always
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "3307:3307"
     expose:
-      - 3306
+      - 3307
     environment:
       MYSQL_DATABASE: veepearl_db
       MYSQL_USER: veepearldb

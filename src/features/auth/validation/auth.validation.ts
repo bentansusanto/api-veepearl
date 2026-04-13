@@ -21,7 +21,8 @@ export class AuthValidation{
       .refine((password) => /[!@#$%^&*]/.test(password), {
         message: 'specialCharacterErrorMessage',
       }),
-    role: z.string().optional(),
+    roleId: z.number().optional(),
+    roleName: z.string().optional(),
   });
 
   // validation login
@@ -80,6 +81,6 @@ export class AuthValidation{
       .refine((password) => /[!@#$%^&*]/.test(password), {
         message: 'specialCharacterErrorMessage',
       }),
-    otpCode: z.string().min(6, { message: 'minLengthErrorMessage' }),
+    token: z.string(),
   });
 }

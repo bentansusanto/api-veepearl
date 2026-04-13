@@ -10,10 +10,12 @@ import {
   Post,
   Put,
   Req,
+  UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { JewelRequest, UpdateJewelRequest } from '../../../models/jewel.model';
 import { JeweltypeService } from './jeweltype.service';
+import { AuthGuard } from '../../../common/guards/auth.guard';
 
 @Controller('api/v1/')
 export class JeweltypeController {
@@ -22,15 +24,12 @@ export class JeweltypeController {
   // create jeweltype
   @Post('create_jeweltype')
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(AuthGuard)
   async createJeweltype(
     @Req() req: Request,
     @Body() jewelReq: JewelRequest,
   ): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.jeweltypeService.createJeweltype(
       userId,
       jewelReq,
@@ -66,16 +65,13 @@ export class JeweltypeController {
   // update jeweltype
   @Put('update_jeweltype/:id')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
   async updateJeweltype(
     @Req() req: Request,
     @Param('id') jewelId: string,
     @Body() jewelReq: UpdateJewelRequest,
   ): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.jeweltypeService.updateJeweltype(
       userId,
       jewelId,
@@ -90,15 +86,12 @@ export class JeweltypeController {
   // delete jeweltype
   @Delete('delete_jeweltype/:id')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard)
   async removeJeweltype(
     @Req() req: Request,
     @Param('id') jewelId: string,
   ): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException('Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.jeweltypeService.removeJeweltyp(userId, jewelId);
     return {
       message: result.message,

@@ -1,52 +1,47 @@
 import {
-    HttpException,
-    HttpStatus,
-    Injectable,
-    NestMiddleware,
-    UnauthorizedException,
-  } from '@nestjs/common';
-  import { Request, Response, NextFunction } from 'express';
-  import { InjectRepository } from '@nestjs/typeorm';
-  import { Repository } from 'typeorm';
-  import { User } from '../features/auth/entities/auth.entity';
-  
-  @Injectable()
-  export class AuthMiddleware implements NestMiddleware {
-    constructor(
-      @InjectRepository(User)
-      private readonly userRepository: Repository<User>,
-    ) {}
-  
-    async use(req: Request, res: Response, next: NextFunction) {
-      try {
-        const authHeader = req.headers.authorization;
-        const token =
-          authHeader && authHeader.startsWith('Bearer')
-            ? authHeader.split(' ')[1]
-            : null;
-  
-        if (!token) {
-          throw new HttpException('No token provided', HttpStatus.UNAUTHORIZED);
-        }
-  
-        const authToken = authHeader.split(' ')[1]; // Mengambil authToken setelah "Bearer "
-        const user = await this.userRepository.findOne({
-          where: { accToken: authToken },
-        });
-  
-        if (!user) {
-          throw new UnauthorizedException('Unauthorized: Invalid auth token');
-        }
-  
-        if (!user.expAccAt || new Date().getTime() > user.expAccAt.getTime()) {
-          throw new HttpException('Token expired', HttpStatus.UNAUTHORIZED);
-        }
-  
-        req['user'] = user; // Menyimpan data user dalam request
-        next(); // Lanjut ke endpoint berikutnya
-      } catch (error) {
-        throw new UnauthorizedException(error.message || 'Unauthorized request');
-      }
+  Injectable,
+  NestMiddleware,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { Request, Response, NextFunction } from 'express';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UserSessions } from '../features/auth/entities/user_session.entity';
+
+@Injectable()
+export class AuthMiddleware implements NestMiddleware {
+  constructor(
+    @InjectRepository(UserSessions)
+    private readonly sessionRepository: Repository<UserSessions>,
+  ) {}
+
+  async use(req: Request, res: Response, next: NextFunction) {
+    const authHeader = req.headers.authorization;
+    const token =
+      authHeader && authHeader.startsWith('Bearer ')
+        ? authHeader.split(' ')[1]
+        : null;
+
+    if (!token) {
+      throw new UnauthorizedException('No token provided');
     }
+
+    const session = await this.sessionRepository.findOne({
+      where: { access_token: token, is_blocked: false },
+      relations: ['user', 'user.role'],
+    });
+
+    if (!session || !session.user) {
+      throw new UnauthorizedException('Unauthorized: Invalid or expired session');
+    }
+
+    // Check session expiration
+    if (new Date() > new Date(session.expire_at)) {
+      throw new UnauthorizedException('Session expired');
+    }
+
+    req['user'] = session.user;
+    req['session'] = session;
+    next();
   }
-  
+}

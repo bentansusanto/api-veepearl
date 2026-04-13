@@ -36,33 +36,34 @@ export class SendMailService {
 
     switch (type) {
       case EmailType.VERIFY_ACCOUNT:
-        subject = subjectMessage;
-        htmlContent = `<div style="font-family: Arial, sans-serif; text-align: center;">
-                    <p>${subjectMessage}</p>
-                    <p>Gunakan kode OTP berikut:</p>
-                    <h2 style="background: #f4f4f4; display: inline-block; padding: 10px; border-radius: 5px;">${otpCode}</h2>
-                    <p>Kode ini berlaku hanya dalam beberapa menit.</p>
-                </div>`;
-        break;
-
-      case EmailType.VERIFY_OTP:
-        subject = subjectMessage;
-        htmlContent = `<div style="font-family: Arial, sans-serif; text-align: center;">
-                    <p>${subjectMessage}</p>
-                    <p>Gunakan kode OTP berikut:</p>
-                    <h2 style="background: #f4f4f4; display: inline-block; padding: 10px; border-radius: 5px;">${otpCode}</h2>
-                    <p>Kode ini berlaku hanya dalam beberapa menit.</p>
-                </div>`;
-        break;
-
-      case EmailType.GENERATE_NEW_OTP:
-        subject = subjectMessage;
-        htmlContent = `<p>Use the following OTP code to proceed:</p><br/><h1>${otpCode}</h1>`;
-        break;
-
       case EmailType.RESET_PASSWORD:
+        const isVerify = type === EmailType.VERIFY_ACCOUNT;
+        const actionText = isVerify ? 'Verify Account' : 'Reset Password';
+        const actionSubtext = isVerify 
+          ? 'Click the button below to verify your account and get started:' 
+          : 'Click the button below to reset your password and secure your account:';
+        const expirationText = isVerify ? '24 hours' : '1 hour';
+        const headline = isVerify ? 'Welcome to Veepearl' : 'Secure Your Account';
+
         subject = subjectMessage;
-        htmlContent = `<p>Click the button below to reset your password:</p><br/><h1>${otpCode}</h1>`;
+        htmlContent = `<div style="font-family: Arial, sans-serif; text-align: center; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px; background-color: #fafafa;">
+                    <div style="margin-bottom: 20px;">
+                        <h1 style="color: #A78E57; margin: 0; font-size: 28px; text-transform: uppercase; letter-spacing: 2px;">Veepearl</h1>
+                    </div>
+                    <div style="background-color: #ffffff; padding: 30px; border-radius: 8px; border: 1px solid #eeeeee;">
+                        <h2 style="color: #333; font-size: 22px; margin-top: 0;">${headline}</h2>
+                        <p style="color: #666; font-size: 16px; line-height: 1.5;">${subjectMessage}</p>
+                        <p style="color: #666; font-size: 14px; margin-bottom: 25px;">${actionSubtext}</p>
+                        
+                        <a href="${otpCode}" style="background-color: #A78E57; color: #fff; padding: 14px 30px; text-decoration: none; border-radius: 30px; display: inline-block; font-weight: bold; font-size: 16px; box-shadow: 0 4px 10px rgba(167, 142, 87, 0.3);">
+                            ${actionText}
+                        </a>
+                    </div>
+                    <div style="margin-top: 20px; color: #999; font-size: 12px;">
+                        <p>This link will expire in ${expirationText}.</p>
+                        <p>&copy; 2026 Veepearl. All Rights Reserved.</p>
+                    </div>
+                </div>`;
         break;
 
       default:

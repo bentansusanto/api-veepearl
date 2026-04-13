@@ -9,14 +9,16 @@ import {
   HttpCode,
   HttpStatus,
   Req,
-  HttpException,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { OrderService } from './order.service';
 import { Request } from 'express';
 import { OrderRequest } from '../../models/order.model';
+import { AuthGuard } from '../../common/guards/auth.guard';
 
 @Controller('api/v1/')
+@UseGuards(AuthGuard)
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
@@ -27,11 +29,7 @@ export class OrderController {
     @Req() req: Request,
     @Body() orderReq: OrderRequest,
   ): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException(' Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.orderService.createOrderPaypal(userId, orderReq);
     return {
       message: result.message,
@@ -45,11 +43,7 @@ export class OrderController {
     @Req() req: Request,
     @Body() orderReq: OrderRequest,
   ): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException(' Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.orderService.createOrderCod(userId, orderReq);
     return {
       message: result.message,
@@ -64,11 +58,7 @@ export class OrderController {
     @Req() req: Request,
     @Query('token') token: string,
   ): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException(' Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.orderService.capturePayment(userId, token);
     return {
       message: result.message,
@@ -83,11 +73,7 @@ export class OrderController {
     @Req() req: Request,
     @Query('token') token: string,
   ): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException(' Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.orderService.verifyPaypalPayment(userId, token);
     return {
       message: result.message,
@@ -102,11 +88,7 @@ export class OrderController {
     @Req() req: Request,
     @Param('id') orderId: string,
   ): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException(' Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.orderService.verifyCODPayment(userId, orderId);
     return {
       message: result.message,
@@ -120,11 +102,7 @@ export class OrderController {
     @Req() req: Request,
     @Body() orderReq: OrderRequest,
   ): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException(' Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.orderService.createOrderByCard(userId, orderReq);
     return {
       message: result.message,
@@ -157,11 +135,7 @@ export class OrderController {
   @Get('find_history_order')
   @HttpCode(HttpStatus.OK)
   async findAllPayment(@Req() req: Request): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException(' Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.orderService.findAllOrderByUser(userId);
     return {
       message: result.message,
@@ -173,11 +147,7 @@ export class OrderController {
   @Get('find_order_user')
   @HttpCode(HttpStatus.OK)
   async findAllPaymentUser(@Req() req: Request): Promise<any> {
-    const user = req['user'];
-    if (!user) {
-      throw new HttpException(' Unauthorized', HttpStatus.UNAUTHORIZED);
-    }
-    const userId = user.id;
+    const userId = req['user'].id;
     const result = await this.orderService.findAllOrderByAdmin(userId);
     return {
       message: result.message,

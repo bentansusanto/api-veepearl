@@ -140,8 +140,11 @@ export class CartService {
 
       // if not found
       if (findCart.length === 0) {
-        this.logger.error('Cart not found');
-        throw new HttpException('Cart not found', HttpStatus.NOT_FOUND);
+        this.logger.info('Cart is empty');
+        return {
+          message: 'Cart is empty',
+          data: [],
+        };
       }
 
       this.logger.info({

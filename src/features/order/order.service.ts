@@ -1,8 +1,21 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomInt } from 'crypto';
+import Hashids from 'hashids';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { ValidationService } from '../../common/validation.service';
+import { In, Repository } from 'typeorm';
 import { Logger } from 'winston';
+import { SendMailService } from '../../common/send-mail.service';
+import { EmailOrders } from '../../common/subject-email.config';
+import { ValidationService } from '../../common/validation.service';
+import {
+  // CapturePaymentRequest,
+  // OrderByCardRequest,
+  OrderRequest,
+} from '../../models/order.model';
+import { User } from '../auth/entities/auth.entity';
+import { Cart } from '../cart/entities/cart.entity';
+import { Pemesan } from '../pemesan/entities/pemesan.entity';
 import {
   Order,
   OrderStatus,
@@ -10,20 +23,7 @@ import {
   PaymentStatus,
   ShippingMethod,
 } from './entities/order.entity';
-import { Repository } from 'typeorm';
-import { Cart } from '../cart/entities/cart.entity';
-import { Pemesan } from '../pemesan/entities/pemesan.entity';
-import { User, UserRole } from '../auth/entities/auth.entity';
-import Hashids from 'hashids';
-import {
-  // CapturePaymentRequest,
-  // OrderByCardRequest,
-  OrderRequest,
-} from '../../models/order.model';
 import { OrderValidation } from './validation/order.validation';
-import { randomInt } from 'crypto';
-import { SendMailService } from '../../common/send-mail.service';
-import { EmailOrders } from '../../common/subject-email.config';
 // import Stripe from 'stripe';
 
 @Injectable()
@@ -354,198 +354,6 @@ export class OrderService {
     }
   }
 
-  // capture payment by visa/mastercard
-  // async capturePaymentByCard(
-  //   userId: string,
-  //   paymentReq: CapturePaymentRequest,
-  // ): Promise<any> {
-  //   try {
-  //     // Validasi paymentIntentId
-  //     if (
-  //       !paymentReq.paymentIntentId ||
-  //       typeof paymentReq.paymentIntentId !== 'string'
-  //     ) {
-  //       this.logger.error(
-  //         'Invalid paymentIntentId',
-  //         paymentReq.paymentIntentId,
-  //       );
-  //       throw new HttpException(
-  //         'Invalid paymentIntentId',
-  //         HttpStatus.BAD_REQUEST,
-  //       );
-  //     }
-
-  //     console.log(
-  //       'Capturing Payment for paymentIntentId:',
-  //       paymentReq.paymentIntentId,
-  //     );
-
-  //     // Ambil payment intent dari Stripe
-  //     let paymentIntent;
-  //     try {
-  //       paymentIntent = await this.stripe.paymentIntents.retrieve(
-  //         paymentReq.paymentIntentId,
-  //       );
-  //     } catch (error: any) {
-  //       console.error(
-  //         'Failed to retrieve PaymentIntent:',
-  //         error.message,
-  //         error.stack,
-  //       );
-  //       throw new HttpException(
-  //         `Failed to retrieve PaymentIntent: ${error.message}`,
-  //         HttpStatus.BAD_REQUEST,
-  //       );
-  //     }
-
-  //     if (!paymentIntent) {
-  //       throw new HttpException(
-  //         'Payment Intent not found',
-  //         HttpStatus.NOT_FOUND,
-  //       );
-  //     }
-
-  //     console.log('PaymentIntent Status:', paymentIntent.status);
-
-  //     // Karena capture_method: 'automatic' di createOrderByCard, paymentIntent seharusnya sudah 'succeeded'
-  //     if (paymentIntent.status === 'succeeded') {
-  //       this.logger.info('Payment already succeeded, no manual capture needed');
-  //     } else if (paymentIntent.status === 'requires_capture') {
-  //       // Capture payment kalau statusnya perlu capture (jarang terjadi karena capture otomatis)
-  //       try {
-  //         await this.stripe.paymentIntents.capture(paymentReq.paymentIntentId);
-  //         this.logger.info('Payment captured manually');
-  //       } catch (error: any) {
-  //         console.error(
-  //           'Failed to capture PaymentIntent:',
-  //           error.message,
-  //           error.stack,
-  //         );
-  //         throw new HttpException(
-  //           `Failed to capture PaymentIntent: ${error.message}`,
-  //           HttpStatus.BAD_REQUEST,
-  //         );
-  //       }
-  //     } else {
-  //       throw new HttpException(
-  //         `Cannot process payment in status: ${paymentIntent.status}`,
-  //         HttpStatus.BAD_REQUEST,
-  //       );
-  //     }
-
-  //     // Ambil ulang payment intent untuk memastikan status terupdate
-  //     const updatedPaymentIntent = await this.stripe.paymentIntents.retrieve(
-  //       paymentReq.paymentIntentId,
-  //     );
-
-  //     if (updatedPaymentIntent.status !== 'succeeded') {
-  //       throw new HttpException(
-  //         'Payment capture failed',
-  //         HttpStatus.BAD_REQUEST,
-  //       );
-  //     }
-
-  //     const orderId = updatedPaymentIntent.metadata.orderId;
-  //     if (!orderId) {
-  //       throw new HttpException(
-  //         'Order ID not found in PaymentIntent metadata',
-  //         HttpStatus.BAD_REQUEST,
-  //       );
-  //     }
-
-  //     // Cari order
-  //     const findOrder = await this.orderRepository.findOne({
-  //       where: {
-  //         id: orderId,
-  //         user: { id: userId },
-  //       },
-  //       relations: ['pemesan', 'user'],
-  //     });
-
-  //     if (!findOrder || findOrder.user.id !== userId) {
-  //       throw new HttpException(
-  //         'Order not found or user mismatch',
-  //         HttpStatus.NOT_FOUND,
-  //       );
-  //     }
-
-  //     if (findOrder.payment_status === PaymentStatus.COMPLETED) {
-  //       this.logger.info('Payment already captured for order:', findOrder.id);
-  //       return {
-  //         message: 'Payment already captured',
-  //         data: {
-  //           id: findOrder.id,
-  //           order_code: findOrder.order_code,
-  //           payment_method: findOrder.payment_method,
-  //           pemesanId: findOrder.pemesan.id,
-  //           amount: findOrder.amount,
-  //           order_status: findOrder.order_status,
-  //           payment_status: findOrder.payment_status,
-  //           transactionId: findOrder.transactionId,
-  //           createdAt: findOrder.createdAt,
-  //         },
-  //       };
-  //     }
-
-  //     // Update order
-  //     await this.orderRepository.update(findOrder.id, {
-  //       payment_status: PaymentStatus.COMPLETED,
-  //       transactionId: updatedPaymentIntent.id,
-  //       order_status: OrderStatus.SHIPPED,
-  //     });
-
-  //     // Reload order untuk mendapatkan data terbaru
-  //     const updatedOrder = await this.orderRepository.findOne({
-  //       where: { id: findOrder.id },
-  //       relations: ['pemesan', 'user'],
-  //     });
-
-  //     // Kirim notifikasi email
-  //     await this.sendMailService.sendOrderNotification(
-  //       EmailOrders.PAYMENT_STATUS,
-  //       {
-  //         subjectMessage: `Payment Status Successfully Updated`,
-  //         paymentStatus: PaymentStatus.COMPLETED,
-  //         totalAmount: updatedOrder.amount,
-  //         email: updatedOrder.pemesan.email,
-  //         orderCode: updatedOrder.order_code,
-  //         customerName: updatedOrder.pemesan.name,
-  //         paymentMethod: updatedOrder.payment_method,
-  //       },
-  //     );
-
-  //     this.logger.info({
-  //       message: 'Payment captured successfully',
-  //       orderId: updatedOrder.id,
-  //       paymentIntentId: updatedPaymentIntent.id,
-  //     });
-
-  //     return {
-  //       message: 'Payment captured successfully',
-  //       data: {
-  //         id: updatedOrder.id,
-  //         order_code: updatedOrder.order_code,
-  //         payment_method: updatedOrder.payment_method,
-  //         pemesanId: updatedOrder.pemesan.id,
-  //         amount: updatedOrder.amount,
-  //         order_status: updatedOrder.order_status,
-  //         payment_status: updatedOrder.payment_status,
-  //         transactionId: updatedOrder.transactionId,
-  //         createdAt: updatedOrder.createdAt,
-  //       },
-  //     };
-  //   } catch (error: any) {
-  //     this.logger.error('Failed to capture payment by card', error.stack);
-  //     if (error instanceof HttpException) {
-  //       throw error;
-  //     }
-  //     throw new HttpException(
-  //       error.message || 'Failed to capture payment by card',
-  //       HttpStatus.INTERNAL_SERVER_ERROR,
-  //     );
-  //   }
-  // }
-
   // authorization paypal
   private async authorizationPaypal() {
     const authResponse = await fetch(
@@ -599,16 +407,20 @@ export class OrderService {
             },
           ],
           application_context: {
-            // return_url: `http://localhost:8081/checkout`,
-            // cancel_url: `http://localhost:8081`,
-            // return_url: `http://localhost:3500/checkout`,
-            // cancel_url: `http://localhost:3500/orders`,
-            return_url: `https://veepearls.com/checkout`,
-            cancel_url: `https://veepearls.com`,
+            return_url:
+              process.env.NODE_ENV === 'development'
+                ? `http://localhost:3300/checkout`
+                : `https://veepearls.com/checkout`,
+            cancel_url:
+              process.env.NODE_ENV === 'development'
+                ? `http://localhost:3300`
+                : `https://veepearls.com`,
             shipping_preference: 'NO_SHIPPING',
             user_action: 'PAY_NOW',
-            brand_name: 'veepearls.com',
-            // brand_name: 'http://localhost:3500',
+            brand_name:
+              process.env.NODE_ENV === 'development'
+                ? `http://localhost:3300`
+                : `https://veepearls.com`,
           },
         }),
       },
@@ -1119,8 +931,9 @@ export class OrderService {
         this.userRepository.findOne({
           where: {
             id: userId,
-            role: UserRole.ADMIN,
+            role: { name: In(['admin', 'owner', 'developer']) },
           },
+          relations: ['role'],
         }),
         this.orderRepository.findOne({
           where: {
@@ -1129,11 +942,8 @@ export class OrderService {
         }),
       ]);
       if (!findUser) {
-        this.logger.error('User not found or not admin');
-        throw new HttpException(
-          'User not found or not admin',
-          HttpStatus.FORBIDDEN,
-        );
+        this.logger.error('User not authorized');
+        throw new HttpException('User not authorized', HttpStatus.FORBIDDEN);
       }
       if (!findOrder) {
         this.logger.error('Order not found');
@@ -1275,7 +1085,8 @@ export class OrderService {
     try {
       const [findUser, findOrder] = await Promise.all([
         this.userRepository.findOne({
-          where: { id: userId, role: UserRole.ADMIN },
+          where: { id: userId, role: { name: In(['admin', 'owner', 'developer']) } },
+          relations: ['role'],
         }),
         this.orderRepository.find({
           relations: ['user', 'pemesan'],
@@ -1301,9 +1112,9 @@ export class OrderService {
         }),
       ]);
 
-      if (findUser.role !== UserRole.ADMIN) {
-        this.logger.error('User is not admin');
-        throw new HttpException('User is not admin', HttpStatus.FORBIDDEN);
+      if (findUser.role.name !== 'admin' && findUser.role.name !== 'owner') {
+        this.logger.error('User not authorized');
+        throw new HttpException('User not authorized', HttpStatus.FORBIDDEN);
       }
       if (!findOrder || findOrder.length === 0) {
         this.logger.error('Order not found');

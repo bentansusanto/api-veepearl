@@ -1,443 +1,428 @@
-import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { ValidationService } from '../../common/validation.service';
-import { Logger } from 'winston';
-import { User, UserRole } from './entities/auth.entity';
+import Hashids from 'hashids';
 import { Repository } from 'typeorm';
+import { SecurityService } from '../../common/security.service';
+import { SendMailService } from '../../common/send-mail.service';
+import { EmailType } from '../../common/subject-email.config';
+import { ValidationService } from '../../common/validation.service';
 import {
-  CheckEmail,
+  AuthResponse,
+  ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
   ResetPasswordRequest,
-  VerifyAccount,
+  VerifyAccountRequest,
 } from '../../models/auth.model';
-import Hashids from 'hashids';
+import { User } from './entities/auth.entity';
+import { Role } from './entities/role.entity';
+import { UserSessions } from './entities/user_session.entity';
 import { AuthValidation } from './validation/auth.validation';
-import bcrypt from 'bcryptjs';
-import { SendMailService } from '../../common/send-mail.service';
-import { EmailType } from '../../common/subject-email.config';
-import { OtpService } from './otp/otp.service';
-import { Request, Response } from 'express';
-import crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
-    private readonly validationService: ValidationService,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
+    @InjectRepository(Role) private readonly roleRepository: Repository<Role>,
+    @InjectRepository(UserSessions)
+    private readonly sessionRepository: Repository<UserSessions>,
+    private readonly validationService: ValidationService,
+    private readonly securityService: SecurityService,
     private readonly sendMailService: SendMailService,
-    private readonly otpService: OtpService,
   ) {}
 
   private hashIds = new Hashids(process.env.ID_SECRET, 20);
-  // create new account
-  async createNewAccount(registerReq: RegisterRequest): Promise<any> {
-    try {
-      let createReq: RegisterRequest;
-      // validation field register
-      try {
-        createReq = this.validationService.validate(
-          AuthValidation.CREATEAUTH,
-          registerReq,
-        );
-      } catch (error: any) {
-        this.logger.error(error.message);
-        throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-      }
 
-      // find existing user
-      const existingUser = await this.userRepository.findOne({
-        where: { email: createReq.email },
-      });
-      if (existingUser) {
-        this.logger.error('Email already exists');
-        throw new HttpException('Email already exists', HttpStatus.BAD_REQUEST);
-      }
+  /**
+   * Register a new user
+   */
+  async register(registerReq: RegisterRequest): Promise<AuthResponse> {
+    const validatedReq = this.validationService.validate(
+      AuthValidation.CREATEAUTH,
+      registerReq,
+    );
 
-      const hashPassword = await bcrypt.hash(createReq.password, 10);
+    const existingUser = await this.userRepository.findOne({
+      where: { email: validatedReq.email },
+    });
+    if (existingUser) {
+      throw new HttpException('Email already exists', HttpStatus.BAD_REQUEST);
+    }
 
-      const { otpCode, expiry } = this.otpService.generateOTP();
-      // create new user
-      const newUser = this.userRepository.create({
-        id: this.hashIds.encode(Date.now()),
-        email: createReq.email,
-        password: hashPassword,
-        name: createReq.name,
-        role: createReq.role || UserRole.CUSTOMER,
-        verifyToken: crypto.randomBytes(32).toString('hex'),
-      });
-      await this.userRepository.save(newUser);
-      // send mail for verify account
-      await this.sendMailService.sendMail(EmailType.VERIFY_ACCOUNT, {
-        email: newUser.email,
-        otpCode,
-        subjectMessage: 'Verify Account',
-      });
+    const hashedPassword = await this.securityService.hashPassword(
+      validatedReq.password,
+    );
 
-      this.logger.info({
-        message: 'New account created',
-        data: {
-          name: newUser.name,
-          email: newUser.email,
-          role: newUser.role,
-        },
-      });
+    // Determine role (default to 'customer')
+    const roleName = validatedReq.roleName || 'customer';
 
-      return {
-        message: 'New account created',
-        data: {
-          name: newUser.name,
-          email: newUser.email,
-          role: newUser.role,
-        },
-      };
-    } catch (error: any) {
-      this.logger.error('Failed to create account', error.message);
-      if (error instanceof HttpException) {
-        throw error;
-      }
+    // constraint: only customer and owner can register
+    if (roleName !== 'customer' && roleName !== 'owner') {
       throw new HttpException(
-        'Failed to create account',
-        HttpStatus.INTERNAL_SERVER_ERROR,
+        'Registration for this role is not allowed',
+        HttpStatus.FORBIDDEN,
       );
     }
+
+    const role = await this.roleRepository.findOne({
+      where: { name: roleName },
+    });
+    if (!role) {
+      throw new HttpException(
+        `Role '${roleName}' not found. Please contact administrator.`,
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // constraint: owner limited to 2 users
+    if (roleName === 'owner') {
+      const ownerCount = await this.userRepository.count({
+        where: { role: { name: 'owner' } },
+      });
+      if (ownerCount >= 2) {
+        throw new HttpException(
+          'Owner limit reached (maximum 2 owners allowed)',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+    }
+
+    const verifyToken = this.securityService.generateRandomToken(32);
+    const expireAt = new Date();
+    expireAt.setHours(expireAt.getHours() + 24); // 24 hours
+
+    const newUser = this.userRepository.create({
+      id: this.hashIds.encode(Date.now()),
+      email: validatedReq.email,
+      password: hashedPassword,
+      name: validatedReq.name,
+      role: role,
+      verifyToken: verifyToken,
+      expireVerifyToken: expireAt,
+      isVerified: false,
+    });
+
+    await this.userRepository.save(newUser);
+
+    // Send verification email with link
+    const isAdmin = newUser.role.name === 'owner';
+    const frontendUrl = isAdmin
+      ? process.env.ADMIN_URL_DEV || 'http://localhost:3700'
+      : process.env.FRONTEND_URL_DEV || 'http://localhost:3300';
+    const verifyUrl = `${frontendUrl}/verify-account?verify_token=${verifyToken}`;
+
+    await this.sendMailService.sendMail(EmailType.VERIFY_ACCOUNT, {
+      email: newUser.email,
+      otpCode: verifyUrl, // Passing the full URL as the code
+      subjectMessage: 'Verify Your Account',
+    });
+
+    return {
+      message:
+        'Registration successful. Please check your email to verify your account.',
+      data: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role.name,
+        createdAt: newUser.createdAt,
+        updatedAt: newUser.updatedAt,
+      },
+    };
   }
 
-  // verify account
-  // async verifyAccount(verifyReq: VerifyAccount): Promise<any> {
-  //   try {
-  //     // find user by email
-  //     const findUser = await this.userRepository.findOne({
-  //       where: {
-  //         email: verifyReq.email,
-  //       },
-  //     });
-  //     // check if user not found
-  //     if (!findUser) {
-  //       this.logger.error('User not found');
-  //       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-  //     }
+  /**
+   * Resend Verification Link
+   */
+  async resendVerification(email: string): Promise<AuthResponse> {
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
 
-  //     // check if user already verified
-  //     if (findUser.isVerified) {
-  //       this.logger.error('Account already verified');
-  //       throw new HttpException(
-  //         'Account already verified',
-  //         HttpStatus.BAD_REQUEST,
-  //       );
-  //     }
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
 
-  //     // update user verified status
-  //     await this.userRepository.update(findUser.id, {
-  //       isVerified: true,
-  //       otpCode: null,
-  //       expOtp: null,
-  //     });
+    if (user.isVerified) {
+      throw new HttpException(
+        'Account already verified',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
-  //     this.logger.info({
-  //       message: 'Account verified continue to login',
-  //       data: {
-  //         name: findUser.name,
-  //         email: findUser.email,
-  //         role: findUser.role || UserRole.CUSTOMER,
-  //       },
-  //     });
+    const verifyToken = this.securityService.generateRandomToken(32);
+    const expireAt = new Date();
+    expireAt.setHours(expireAt.getHours() + 24);
 
-  //     return {
-  //       message: 'Account verified, continue to login',
-  //       data: {
-  //         name: findUser.name,
-  //         email: findUser.email,
-  //         role: findUser.role || UserRole.CUSTOMER,
-  //       },
-  //     };
-  //   } catch (error: any) {
-  //     this.logger.error('Failed to verify account', error.message);
-  //     if (error instanceof HttpException) {
-  //       throw error;
-  //     }
-  //     throw new HttpException(
-  //       'Failed to verify account',
-  //       HttpStatus.INTERNAL_SERVER_ERROR,
-  //     );
-  //   }
-  // }
+    user.verifyToken = verifyToken;
+    user.expireVerifyToken = expireAt;
+    await this.userRepository.save(user);
 
-  // login user
-  // async loginUser(loginReq: LoginRequest): Promise<any> {
-  //   try {
-  //     // find user
-  //     const findUser = await this.userRepository.findOne({
-  //       where: {
-  //         email: loginReq.email,
-  //         isVerified: true,
-  //       },
-  //     });
-  //     // check if user not exist or not verified
-  //     if (!findUser) {
-  //       this.logger.error('User not found or not verified');
-  //       throw new HttpException(
-  //         ' User not found or not verified',
-  //         HttpStatus.NOT_FOUND,
-  //       );
-  //     }
+    const isAdmin = user.role.name === 'owner';
+    const frontendUrl = isAdmin
+      ? process.env.ADMIN_URL_DEV || 'http://localhost:3700'
+      : process.env.FRONTEND_URL_DEV || 'http://localhost:3300';
+    const verifyUrl = `${frontendUrl}/verify-account?verify_token=${verifyToken}`;
 
-  //     const isValidPassword = await bcrypt.compare(
-  //       loginReq.password,
-  //       findUser.password,
-  //     );
-  //     if (!isValidPassword) {
-  //       this.logger.error('Invalid password');
-  //       throw new HttpException('Invalid password', HttpStatus.UNAUTHORIZED);
-  //     }
+    await this.sendMailService.sendMail(EmailType.VERIFY_ACCOUNT, {
+      email: user.email,
+      otpCode: verifyUrl,
+      subjectMessage: 'Verify Your Account (New Link Requested)',
+    });
 
-  //     const { otpCode, expiry } = this.otpService.generateOTP();
-  //     await this.userRepository.update(findUser.id, {
-  //       otpCode,
-  //       expOtp: new Date(expiry),
-  //     });
-  //     // send mail for verify otp
-  //     await this.sendMailService.sendMail(EmailType.VERIFY_OTP, {
-  //       email: findUser.email,
-  //       otpCode,
-  //       subjectMessage: 'Verify Otp',
-  //     });
+    return {
+      message: 'A new verification link has been sent to your email.',
+    };
+  }
 
-  //     this.logger.info({
-  //       message: 'User login successfully',
-  //     });
+  /**
+   * Verify account using token
+   */
+  async verifyAccount(verifyReq: VerifyAccountRequest): Promise<AuthResponse> {
+    const user = await this.userRepository.findOne({
+      where: { verifyToken: verifyReq.token },
+    });
 
-  //     return {
-  //       message: 'Login Successfull Check OTP Code in your email',
-  //       data: findUser.role,
-  //     };
-  //   } catch (error: any) {
-  //     this.logger.error('Failed to create subscription', error.message);
-  //     if (error instanceof HttpException) {
-  //       throw error;
-  //     }
-  //     throw new HttpException(
-  //       'Failed to create subscription',
-  //       HttpStatus.INTERNAL_SERVER_ERROR,
-  //     );
-  //   }
-  // }
+    if (!user) {
+      throw new HttpException(
+        'Invalid verification token or email',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
-  // get user
-  // async getUser(user: User): Promise<any> {
-  //   return {
-  //     message: 'User found',
-  //     data: {
-  //       name: user.name,
-  //       email: user.email,
-  //       role: user.role,
-  //     },
-  //   };
-  // }
+    if (user.isVerified) {
+      throw new HttpException(
+        'Account already verified',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
-  // logout user
-  // async logout(userId: string): Promise<any> {
-  //   try {
-  //     // find user by id
-  //     const findUser = await this.userRepository.findOne({
-  //       where: { id: userId },
-  //     });
-  //     // check if user not found
-  //     if (!findUser) {
-  //       this.logger.error('User not found');
-  //       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-  //     }
-  //     // update logout
-  //     await this.userRepository.update(findUser.id, {
-  //       authToken: null,
-  //       accToken: null,
-  //     });
-  //     this.logger.info({
-  //       message: 'User logout successfully',
-  //     });
-  //     return {
-  //       message: 'User logout successfully',
-  //     };
-  //   } catch (error: any) {
-  //     this.logger.error('Failed to logout', error.message);
-  //     if (error instanceof HttpException) {
-  //       throw error;
-  //     }
-  //     throw new HttpException(
-  //       'Failed to logout',
-  //       HttpStatus.INTERNAL_SERVER_ERROR,
-  //     );
-  //   }
-  // }
+    if (
+      user.expireVerifyToken &&
+      new Date() > new Date(user.expireVerifyToken)
+    ) {
+      throw new HttpException(
+        'Verification link has expired. Please request a new one.',
+        HttpStatus.GONE,
+      );
+    }
 
-  // refresh token
-  // async refreshTokens(req: Request, res: Response): Promise<any> {
-  //   try {
-  //     const refreshToken = req.cookies.session_token;
-  //     if (!refreshToken) {
-  //       this.logger.error('Refresh token not found');
-  //       throw new HttpException(
-  //         'Refresh token not found',
-  //         HttpStatus.NOT_FOUND,
-  //       );
-  //     }
-  //     const findUser = await this.userRepository.findOne({
-  //       where: { authToken: refreshToken },
-  //     });
-  //     if (!findUser || findUser.authToken !== refreshToken) {
-  //       this.logger.error('Invalid refresh token');
-  //       throw new HttpException(
-  //         'Invalid refresh token',
-  //         HttpStatus.UNAUTHORIZED,
-  //       );
-  //     }
-  //     const newAccessToken = crypto
-  //       .randomBytes(100)
-  //       .toString('hex')
-  //       .toUpperCase();
-  //     const newRefreshToken = crypto
-  //       .randomBytes(100)
-  //       .toString('hex')
-  //       .toUpperCase();
+    user.isVerified = true;
+    user.verifyToken = null;
+    user.expireVerifyToken = null;
+    await this.userRepository.save(user);
 
-  //     const accessTokenExpiresAt = new Date();
-  //     accessTokenExpiresAt.setHours(accessTokenExpiresAt.getHours() + 1);
+    return {
+      message: 'Account verified successfully. You can now log in.',
+    };
+  }
 
-  //     await this.userRepository.update(findUser.id, {
-  //       accToken: newAccessToken,
-  //       authToken: newRefreshToken,
-  //       expAccAt: accessTokenExpiresAt.toISOString(),
-  //     });
-  //     this.logger.info({
-  //       message: 'Refresh token successfully',
-  //     });
+  /**
+   * Login user and generate tokens
+   */
+  async login(loginReq: LoginRequest, ip: string): Promise<AuthResponse> {
+    const validatedReq = this.validationService.validate(
+      AuthValidation.LOGIN,
+      loginReq,
+    );
 
-  //     res.setHeader('Authorization', `Bearer ${newAccessToken}`);
-  //     res.cookie('session_token', newRefreshToken, {
-  //       httpOnly: true,
-  //       secure: true,
-  //       sameSite: 'none',
-  //       maxAge: 7 * 24 * 60 * 60 * 1000, // 1
-  //     });
+    const user = await this.userRepository.findOne({
+      where: { email: validatedReq.email },
+      relations: ['role'],
+    });
 
-  //     res.status(200).json({
-  //       error: false,
-  //       message: 'Token refresh successful',
-  //       tokens: newAccessToken,
-  //     });
-  //   } catch (error: any) {
-  //     this.logger.error(error.message);
-  //     if (error instanceof HttpException) {
-  //       throw error; // Jika sudah HttpException, lempar ulang
-  //     }
-  //     throw new HttpException(
-  //       'Internal Server Error',
-  //       HttpStatus.INTERNAL_SERVER_ERROR,
-  //     );
-  //   }
-  // }
+    if (
+      !user ||
+      !(await this.securityService.verifyPassword(
+        validatedReq.password,
+        user.password,
+      ))
+    ) {
+      throw new HttpException(
+        'Invalid email or password',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
 
-  // forgot password
-  // async forgotPassword(checkEmail: CheckEmail): Promise<any> {
-  //   try {
-  //     // find user by email
-  //     const findUser = await this.userRepository.findOne({
-  //       where: { email: checkEmail.email },
-  //     });
-  //     // check if user not found
-  //     if (!findUser) {
-  //       this.logger.error('User not found');
-  //       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-  //     }
+    if (!user.isVerified) {
+      throw new HttpException(
+        'Please verify your account first',
+        HttpStatus.FORBIDDEN,
+      );
+    }
 
-  //     const { otpCode, expiry } = this.otpService.generateOTP();
-  //     await this.userRepository.update(findUser.id, {
-  //       otpCode,
-  //       expOtp: new Date(expiry),
-  //     });
+    const accessToken = this.securityService.generateAccessToken();
+    const sessionToken = this.securityService.generateSessionToken();
 
-  //     await this.sendMailService.sendMail(EmailType.RESET_PASSWORD, {
-  //       email: findUser.email,
-  //       otpCode,
-  //       subjectMessage: 'Reset Password',
-  //     });
-  //     this.logger.info({
-  //       message: 'Forgot password successfully',
-  //     });
-  //     return {
-  //       error: false,
-  //       message: 'Forgot password successfully check your email',
-  //     };
-  //   } catch (error: any) {
-  //     this.logger.error('Failed to logout', error.message);
-  //     if (error instanceof HttpException) {
-  //       throw error;
-  //     }
-  //     throw new HttpException(
-  //       'Failed to logout',
-  //       HttpStatus.INTERNAL_SERVER_ERROR,
-  //     );
-  //   }
-  // }
+    const expireAt = new Date();
+    expireAt.setDate(expireAt.getDate() + 7); // 7 days
 
-  // reset password
-  // async resetPassword(requestReset: ResetPasswordRequest): Promise<any> {
-  //   try {
-  //     const findUser = await this.userRepository.findOne({
-  //       where: { email: requestReset.email },
-  //     });
-  //     if (!findUser) {
-  //       this.logger.error('User not found');
-  //       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
-  //     }
-  //     let resetReq: ResetPasswordRequest;
-  //     try {
-  //       resetReq = this.validationService.validate(
-  //         AuthValidation.RESETPASSWORD,
-  //         requestReset,
-  //       );
-  //     } catch (error: any) {
-  //       this.logger.error(error.message);
-  //       throw new HttpException('Invalid Validation', HttpStatus.BAD_REQUEST);
-  //     }
+    // Save session to DB
+    const session = this.sessionRepository.create({
+      user: user,
+      access_token: accessToken,
+      ref_token: sessionToken,
+      expire_at: expireAt.toISOString(),
+      client_ip: ip,
+    });
+    await this.sessionRepository.save(session);
 
-  //     if (resetReq.password !== resetReq.retryPassword) {
-  //       this.logger.error('Password and retry password not match');
-  //       throw new HttpException(
-  //         'Password and retry password not match',
-  //         HttpStatus.BAD_REQUEST,
-  //       );
-  //     }
+    return {
+      message: 'Login successful',
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role.name,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        sessiontoken: sessionToken,
+        access_token: accessToken,
+      },
+    };
+  }
 
-  //     const hashedPassword = await bcrypt.hash(requestReset.password, 10);
-  //     await this.userRepository.update(requestReset.email, {
-  //       password: hashedPassword,
-  //       otpCode: null,
-  //       expOtp: null,
-  //     });
-  //     this.logger.info({
-  //       message: 'Password reset successfully',
-  //     });
+  /**
+   * Logout user
+   */
+  async logout(sessionToken: string): Promise<any> {
+    const session = await this.sessionRepository.findOne({
+      where: { ref_token: sessionToken },
+    });
 
-  //     return {
-  //       message: 'Password reset successfully',
-  //       data: {
-  //         name: findUser.name,
-  //         email: findUser.email,
-  //         role: findUser.role,
-  //       },
-  //     };
-  //   } catch (error: any) {
-  //     this.logger.error(error.message);
-  //     if (error instanceof HttpException) {
-  //       throw error; // Jika sudah HttpException, lempar ulang
-  //     }
-  //     throw new HttpException(
-  //       'Internal Server Error',
-  //       HttpStatus.INTERNAL_SERVER_ERROR,
-  //     );
-  //   }
-  // }
+    if (session) {
+      await this.sessionRepository.delete(session.id);
+    }
+
+    return {
+      message: 'Logout successful',
+    };
+  }
+
+  /**
+   * Forgot Password
+   */
+  async forgotPassword(
+    forgotReq: ForgotPasswordRequest,
+  ): Promise<AuthResponse> {
+    const user = await this.userRepository.findOne({
+      where: { email: forgotReq.email },
+    });
+
+    if (!user) {
+      throw new HttpException('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    const resetToken = this.securityService.generateRandomToken(32);
+    const expireAt = new Date();
+    expireAt.setHours(expireAt.getHours() + 1); // 1 hour
+
+    user.passwordResetToken = resetToken;
+    user.passwordResetExpire = expireAt;
+    await this.userRepository.save(user);
+
+    const isAdmin = user.role.name === 'owner';
+    const frontendUrl = isAdmin
+      ? process.env.ADMIN_URL_DEV || 'http://localhost:3700'
+      : process.env.FRONTEND_URL_DEV || 'http://localhost:3300';
+    const resetUrl = `${frontendUrl}/reset-password?verify_token=${resetToken}`;
+
+    await this.sendMailService.sendMail(EmailType.RESET_PASSWORD, {
+      email: user.email,
+      otpCode: resetUrl,
+      subjectMessage: 'Reset Your Password',
+    });
+
+    return {
+      message: 'Password reset token sent to your email.',
+    };
+  }
+
+  /**
+   * Reset Password
+   */
+  async resetPassword(resetReq: ResetPasswordRequest): Promise<AuthResponse> {
+    const validatedReq = this.validationService.validate(
+      AuthValidation.RESETPASSWORD,
+      resetReq,
+    );
+
+    if (validatedReq.password !== validatedReq.retryPassword) {
+      throw new HttpException('Passwords do not match', HttpStatus.BAD_REQUEST);
+    }
+
+    const user = await this.userRepository.findOne({
+      where: {
+        passwordResetToken: validatedReq.token,
+      },
+    });
+
+    if (!user || user.passwordResetExpire < new Date()) {
+      throw new HttpException(
+        'Invalid or expired reset token',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    user.password = await this.securityService.hashPassword(
+      validatedReq.password,
+    );
+    user.passwordResetToken = null;
+    user.passwordResetExpire = null;
+    await this.userRepository.save(user);
+
+    return {
+      message: 'Password reset successfully. You can now log in.',
+    };
+  }
+
+  /**
+   * Refresh Access Token using Session Token
+   */
+  async refreshToken(sessionToken: string): Promise<AuthResponse> {
+    const session = await this.sessionRepository.findOne({
+      where: { ref_token: sessionToken, is_blocked: false },
+      relations: ['user', 'user.role'],
+    });
+
+    if (!session) {
+      throw new HttpException('Invalid session', HttpStatus.UNAUTHORIZED);
+    }
+
+    if (new Date() > new Date(session.expire_at)) {
+      throw new HttpException('Session expired', HttpStatus.UNAUTHORIZED);
+    }
+
+    const newAccessToken = this.securityService.generateAccessToken();
+    session.access_token = newAccessToken;
+    await this.sessionRepository.save(session);
+
+    return {
+      message: 'Token refreshed successfully',
+      data: {
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+        role: session.user.role.name,
+        createdAt: session.user.createdAt,
+        updatedAt: session.user.updatedAt,
+        sessiontoken: session.ref_token,
+        access_token: session.access_token,
+      },
+    };
+  }
+
+  /**
+   * Get Current User
+   */
+  async getCurrentUser(user: User): Promise<any> {
+    return {
+      message: 'User profile retrieved',
+      data: {
+        name: user.name,
+        email: user.email,
+        role: user.role.name,
+      },
+    };
+  }
 }

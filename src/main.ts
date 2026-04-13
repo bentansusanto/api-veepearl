@@ -7,7 +7,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(cookieParser());
   const origins = [
-    'http://localhost:3500',
+    'http://localhost:3300',
     'http://localhost:3000',
     'http://localhost:3700',
     'https://veepearls.com',

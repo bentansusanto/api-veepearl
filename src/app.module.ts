@@ -8,6 +8,7 @@ import { JeweltypeModule } from './features/product/jeweltype/jeweltype.module';
 import { CartModule } from './features/cart/cart.module';
 import { PemesanModule } from './features/pemesan/pemesan.module';
 import { OrderModule } from './features/order/order.module';
+import { SeederModule } from './features/seeder/seeder.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { OrderModule } from './features/order/order.module';
     CartModule,
     PemesanModule,
     OrderModule,
+    SeederModule,
   ],
   controllers: [AppController],
   providers: [AppService],

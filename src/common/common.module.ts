@@ -16,10 +16,12 @@ import { Order } from '../features/order/entities/order.entity';
 import { Pemesan } from '../features/pemesan/entities/pemesan.entity';
 import { Product } from '../features/product/entities/product.entity';
 import { Jeweltype } from '../features/product/jeweltype/entities/jeweltype.entity';
+import { Role } from '../features/auth/entities/role.entity';
+import { UserSessions } from '../features/auth/entities/user_session.entity';
 import { ErrorFilter } from './error.config';
-import { AuthMiddleware } from './middleware';
 import { SendMailService } from './send-mail.service';
 import { ValidationService } from './validation.service';
+
 @Global()
 @Module({
   imports: [
@@ -44,11 +46,10 @@ import { ValidationService } from './validation.service';
         host: configService.get<string>('DB_HOST'),
         port: Number(configService.get<string>('DB_PORT')),
         username: configService.get<string>('DB_USER'),
-        password: configService.get<string>('DB_PASS') || 'Veepearls01!',
+        password: configService.get<string>('DB_PASS'),
         database: configService.get<string>('DB_NAME'),
         autoLoadEntities: true,
         synchronize: configService.get<string>('NODE_ENV') === 'production',
-        // synchronize: configService.get<string>('NODE_ENV') === 'development',
         charset: 'utf8mb4',
         ssl: false,
         extra: {
@@ -59,7 +60,16 @@ import { ValidationService } from './validation.service';
         // logging: true,
       }),
     }),
-    TypeOrmModule.forFeature([User, Product, Jeweltype, Cart, Pemesan, Order]),
+    TypeOrmModule.forFeature([
+      User,
+      Role,
+      UserSessions,
+      Product,
+      Jeweltype,
+      Cart,
+      Pemesan,
+      Order,
+    ]),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
@@ -72,176 +82,6 @@ import { ValidationService } from './validation.service';
     SendMailService,
     { provide: APP_FILTER, useClass: ErrorFilter },
   ],
-  exports: [TypeOrmModule, ThrottlerModule],
+  exports: [TypeOrmModule, ThrottlerModule, ValidationService, SendMailService],
 })
-export class CommonModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(AuthMiddleware)
-      .exclude(
-        // authentication
-        {
-          path: 'api/v1/auth/register',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/auth/verify_account',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/auth/login',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/auth/verify_otp',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/auth/generate_new_otp',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/auth/refresh_token',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/auth/forgot_password',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/auth/reset_password',
-          method: RequestMethod.POST,
-        },
-        // product
-        {
-          path: 'api/v1/products',
-          method: RequestMethod.GET,
-        },
-        {
-          path: 'api/v1/products/:id',
-          method: RequestMethod.GET,
-        },
-        // jeweltype
-        {
-          path: 'api/v1/jeweltypes',
-          method: RequestMethod.GET,
-        },
-        {
-          path: 'api/v1/jeweltypes/:id',
-          method: RequestMethod.GET,
-        },
-      )
-      .forRoutes(
-        // authentication
-        {
-          path: 'api/v1/auth/getUser',
-          method: RequestMethod.GET,
-        },
-        {
-          path: 'api/v1/auth/logout',
-          method: RequestMethod.POST,
-        },
-        // product
-        {
-          path: 'api/v1/create_product',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/update_product/:id',
-          method: RequestMethod.PUT,
-        },
-        {
-          path: 'api/v1/delete_product/:id',
-          method: RequestMethod.DELETE,
-        },
-        // jeweltype
-        {
-          path: 'api/v1/create_jeweltype',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/update_jeweltype/:id',
-          method: RequestMethod.PUT,
-        },
-        {
-          path: 'api/v1/delete_jeweltype/:id',
-          method: RequestMethod.DELETE,
-        },
-        // cart
-        {
-          path: 'api/v1/add_cart',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/find_cart',
-          method: RequestMethod.GET,
-        },
-        {
-          path: 'api/v1/update_product_cart/:id',
-          method: RequestMethod.PUT,
-        },
-        {
-          path: 'api/v1/remove_product_cart/:id',
-          method: RequestMethod.DELETE,
-        },
-        // pemesan
-        {
-          path: 'api/v1/create_pemesan',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/update_pemesan/:id',
-          method: RequestMethod.PUT,
-        },
-        {
-          path: 'api/v1/delete_pemesan/:id',
-          method: RequestMethod.DELETE,
-        },
-        {
-          path: 'api/v1/find_pemesan/:id',
-          method: RequestMethod.GET,
-        },
-        {
-          path: 'api/v1/find_all_pemesan',
-          method: RequestMethod.GET,
-        },
-        // order
-        {
-          path: 'api/v1/create_order_product_paypal',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/create_order_product_cod',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/capture_payment_paypal',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/verify_payment_paypal',
-          method: RequestMethod.GET,
-        },
-        {
-          path: 'api/v1/verify_payment_cod/:id',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/create_order_product_card',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/capture_payment_card',
-          method: RequestMethod.POST,
-        },
-        {
-          path: 'api/v1/find_history_order',
-          method: RequestMethod.GET,
-        },
-        {
-          path: 'api/v1/find_order_user',
-          method: RequestMethod.GET,
-        },
-      );
-  }
-}
+export class CommonModule {}

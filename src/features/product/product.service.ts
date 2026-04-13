@@ -2,11 +2,11 @@ import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import Hashids from 'hashids';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Logger } from 'winston';
 import { ValidationService } from '../../common/validation.service';
 import { ProductRequest, UpdateProductRequest } from '../../models/product.model';
-import { User, UserRole } from '../auth/entities/auth.entity';
+import { User } from '../auth/entities/auth.entity';
 import { Product } from './entities/product.entity';
 import { Jeweltype } from './jeweltype/entities/jeweltype.entity';
 import { ProductValidation } from './validation/product.validation';
@@ -87,13 +87,13 @@ export class ProductService {
         throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       }
 
-      // find user as admin and jeweltype
-      const [findAdmin, findJeweltype] = await Promise.all([
+      const [findAuthor, findJeweltype] = await Promise.all([
         this.userRepository.findOne({
           where: {
             id: userId,
-            role: UserRole.ADMIN,
+            role: { name: In(['admin', 'owner', 'developer']) },
           },
+          relations: ['role'],
         }),
         this.jeweltypeRepository.findOne({
           where: {
@@ -101,10 +101,10 @@ export class ProductService {
           },
         }),
       ]);
-      // check user as admin
-      if (!findAdmin) {
-        this.logger.error('User is not admin');
-        throw new HttpException('User is not admin', HttpStatus.FORBIDDEN);
+      // check user authorization
+      if (!findAuthor) {
+        this.logger.error('User is not authorized to create products');
+        throw new HttpException('User is not authorized to create products', HttpStatus.FORBIDDEN);
       }
       // check jeweltype
       if (!findJeweltype) {
@@ -239,13 +239,14 @@ export class ProductService {
         this.logger.error('Invalid update product request');
         throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       }
-      // find user as admin and product
-      const [findAdmin, findProduct] = await Promise.all([
+      // find user author and product
+      const [findAuthor, findProduct] = await Promise.all([
         this.userRepository.findOne({
           where: {
             id: userId,
-            role: UserRole.ADMIN,
+            role: { name: In(['admin', 'owner', 'developer']) },
           },
+          relations: ['role'],
         }),
         this.productRepository.findOne({
           where: {
@@ -254,10 +255,10 @@ export class ProductService {
           relations: ['jeweltype'],
         }),
       ]);
-      // check user as admin and product
-      if (!findAdmin) {
-        this.logger.error('User is not admin');
-        throw new HttpException('User is not admin', HttpStatus.FORBIDDEN);
+      // check user authorization and product
+      if (!findAuthor) {
+        this.logger.error('User is not authorized to update products');
+        throw new HttpException('User is not authorized to update products', HttpStatus.FORBIDDEN);
       }
       if (!findProduct) {
         this.logger.error('Product not found');
@@ -299,13 +300,14 @@ export class ProductService {
   // delete product
   async removeProduct(userId: string, productId: string): Promise<any> {
     try {
-      // find user as admin and product
-      const [findAdmin, findProduct] = await Promise.all([
+      // find user author and product
+      const [findAuthor, findProduct] = await Promise.all([
         this.userRepository.findOne({
           where: {
             id: userId,
-            role: UserRole.ADMIN,
+            role: { name: In(['admin', 'owner', 'developer']) },
           },
+          relations: ['role'],
         }),
         this.productRepository.findOne({
           where: {
@@ -314,9 +316,9 @@ export class ProductService {
           relations: ['carts'],  
         }),
       ]);
-      if (!findAdmin || !findProduct) {
-        this.logger.error('User is not admin or Product not found');
-        throw new HttpException('User is not admin or Product not found', HttpStatus.FORBIDDEN);
+      if (!findAuthor || !findProduct) {
+        this.logger.error('User not authorized or Product not found');
+        throw new HttpException('User not authorized or Product not found', HttpStatus.FORBIDDEN);
       }
       // check product has cart
       if (findProduct.carts && findProduct.carts.length > 0) {

@@ -4,8 +4,8 @@ import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { ValidationService } from '../../../common/validation.service';
 import { Logger } from 'winston';
 import { Jeweltype } from './entities/jeweltype.entity';
-import { Repository } from 'typeorm';
-import { User, UserRole } from '../../../features/auth/entities/auth.entity';
+import { In, Repository } from 'typeorm';
+import { User } from '../../../features/auth/entities/auth.entity';
 import Hashids from 'hashids';
 import { JewelRequest, UpdateJewelRequest } from '../../../models/jewel.model';
 import { JewelTypeValidation } from './validation/jeweltype.validation';
@@ -47,13 +47,14 @@ export class JeweltypeService {
         throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       }
 
-      // find user as admin and find jeweltype
-      const [findAdmin, findJeweltype] = await Promise.all([
+      // find user author and find jeweltype
+      const [findAuthor, findJeweltype] = await Promise.all([
         this.userRepository.findOne({
           where: {
             id: userId,
-            role: UserRole.ADMIN,
+            role: { name: In(['admin', 'owner', 'developer']) },
           },
+          relations: ['role'],
         }),
         this.jeweltypeRepository.findOne({
           where: {
@@ -61,11 +62,10 @@ export class JeweltypeService {
           },
         }),
       ]);
-
-      // check if user is admin
-      if (!findAdmin) {
-        this.logger.error('User is not admin');
-        throw new HttpException('User is not admin', HttpStatus.FORBIDDEN);
+      // check user authorization
+      if (!findAuthor) {
+        this.logger.error('User is not authorized to create jewelry types');
+        throw new HttpException('User is not authorized to create jewelry types', HttpStatus.FORBIDDEN);
       }
       // check if jeweltype already exists
       if (findJeweltype) {
@@ -182,12 +182,13 @@ export class JeweltypeService {
         this.logger.error('Invalid update jeweltype request');
         throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       }
-      const [findAdmin, findJeweltype] = await Promise.all([
+      const [findAuthor, findJeweltype] = await Promise.all([
         this.userRepository.findOne({
           where: {
             id: userId,
-            role: UserRole.ADMIN,
+            role: { name: In(['admin', 'owner', 'developer']) },
           },
+          relations: ['role'],
         }),
         this.jeweltypeRepository.findOne({
           where: {
@@ -196,7 +197,7 @@ export class JeweltypeService {
         }),
       ]);
       // check if user is admin
-      if (!findAdmin) {
+      if (!findAuthor) {
         this.logger.error('User is not admin');
         throw new HttpException('User is not admin', HttpStatus.FORBIDDEN);
       }
@@ -232,12 +233,13 @@ export class JeweltypeService {
   // remove jeweltype
   async removeJeweltyp(userId: string, jewelId: string): Promise<any> {
     try {
-      const [findAdmin, findJeweltype] = await Promise.all([
+      const [findAuthor, findJeweltype] = await Promise.all([
         this.userRepository.findOne({
           where: {
             id: userId,
-            role: UserRole.ADMIN,
+            role: { name: In(['admin', 'owner', 'developer']) },
           },
+          relations: ['role'],
         }),
         this.jeweltypeRepository.findOne({
           where: {
@@ -246,7 +248,7 @@ export class JeweltypeService {
         }),
       ]);
       // check if user is admin
-      if (!findAdmin) {
+      if (!findAuthor) {
         this.logger.error('User is not admin');
         throw new HttpException('User is not admin', HttpStatus.FORBIDDEN);
       }

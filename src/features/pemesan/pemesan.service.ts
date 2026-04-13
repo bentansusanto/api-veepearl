@@ -122,8 +122,11 @@ export class PemesanService {
       });
       // check if pemesan not found
       if(!findPemesan || findPemesan.length === 0){
-        this.logger.error('Pemesan not found');
-        throw new HttpException('Pemesan not found', HttpStatus.NOT_FOUND)
+        this.logger.info('Pemesan list is empty');
+        return {
+          message: 'Pemesan list is empty',
+          data: [],
+        }
       }
       this.logger.info({
         message: 'Successfully find pemesan',
@@ -155,23 +158,9 @@ export class PemesanService {
             id: userId,
           },
         },
-        relations: ['user'],
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          phone: true,
-          address: true,
-          city: true,
-          country: true,
-          zip_code: true,
-          user: {
-            id: true,
-          }
-        }
       })
       // check if pemesan not found
-      if(!findPemesan || findPemesan.user.id !== userId){
+      if(!findPemesan){
         this.logger.error('Pemesan not found or user not found');
         throw new HttpException('Pemesan not found or user not found', HttpStatus.NOT_FOUND)
       }
